@@ -136,11 +136,7 @@ npm run pack:win:setup:x64     # Windows 安装包
 
 上游的 `publish/` 目录（生成 `version.json` 的发布脚本）保留着，它只是发布工具、与运行时无关 —— 客户端已不再读取该文件。
 
-### 发布前要改的一处
 
-**联系邮箱**：`package.json` 的 `author.email` 目前是 `CHANGE_ME@example.com` 占位值。仓库坐标（`repository` / `bugs` / `homepage`）已指向本 fork 的 GitHub 仓库，`author.name` 使用项目名 `LX Focus`，两者都不含个人信息，无需改动。
-
-`author.name` 同时决定「关于」页里开源地址、Releases 地址、Issue 链接的推导结果 —— 由于它现在是项目名而非账号名，这些链接由 `repository` 字段提供，改仓库地址时改 `repository` 即可。
 
 ## 目录结构（本项目新增部分）
 
@@ -156,9 +152,4 @@ src/common/types/focus.d.ts                 类型声明
 NOTICE                                      修改声明
 ```
 
-## 已知不足
 
-- 原生辅助进程目前只有 Windows 实现；macOS / Linux 上专注锁降级为窗口层 + 快捷键层
-- 界面文案目前只有中文，尚未接入上游的 i18n 体系
-- 应用图标仍是上游资源，尚未替换
-- **32 位打包有静默降级的风险**：`better-sqlite3` 的 `prebuilds/` 里没有 `win32-ia32`，而 `deps.copyLib` 找不到预编译件时只打印一行日志就返回，随后打进包里的是上一次留下的 `build/Release/better_sqlite3.node`（通常是 x64）。若要发布 32 位版本，请先确认包内该文件确实是 ia32，或干脆只发 x64。
