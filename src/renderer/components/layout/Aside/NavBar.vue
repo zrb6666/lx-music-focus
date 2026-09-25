@@ -29,6 +29,16 @@ export default {
       const size = iconSize.value
       return [
         {
+          to: '/focus',
+          // 专注是本项目的核心新增页面，未走 i18n 词条，直接使用中文标签
+          tips: '专注',
+          icon: '#icon-focus',
+          iconSize: '0 0 24 24',
+          size,
+          name: 'Focus',
+          enable: true,
+        },
+        {
           to: '/search',
           tips: t('search'),
           icon: '#icon-search-2',

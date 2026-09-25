@@ -2,13 +2,11 @@ import initRendererEvent, { handleKeyDown, hotKeyConfigUpdate } from './renderer
 
 import { APP_EVENT_NAMES } from '@common/constants'
 import { createWindow, minimize, setProgressBar, setProxy, setThumbarButtons, toggleHide, toggleMinimize } from './main'
-import initUpdate from './autoUpdate'
 import { HOTKEY_COMMON } from '@common/hotKey'
 import { quitApp } from '@main/app'
 
 export default () => {
   initRendererEvent()
-  initUpdate()
 
   global.lx.event_app.on('hot_key_down', ({ type, key }) => {
     let info = global.lx.hotKey.config.global.keys[key]

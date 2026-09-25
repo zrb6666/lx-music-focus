@@ -74,16 +74,6 @@ declare global {
       'common.transparentWindow': boolean
 
       /**
-       * 尝试自动更新
-       */
-      'common.tryAutoUpdate': boolean
-
-      /**
-       * 更新版本后是否显示变更日志
-       */
-      'common.showChangeLog': boolean
-
-      /**
        * 启动时自动播放歌曲
        */
       'player.startupAutoPlay': boolean
@@ -690,6 +680,59 @@ declare global {
        * 是否在离开搜索界面时自动清空搜索结果列表
        */
       'odc.isAutoClearSearchList': boolean
+
+      /**
+       * 单轮专注时长（分钟）
+       */
+      'focus.focusMinutes': number
+
+      /**
+       * 单轮休息时长（分钟）
+       */
+      'focus.breakMinutes': number
+
+      /**
+       * 总轮数
+       */
+      'focus.rounds': number
+
+      /**
+       * 本次专注的任务名，写入会话记录
+       */
+      'focus.taskName': string
+
+      /**
+       * 严格模式：启用原生辅助进程（拦截 Win 键 / Alt+Tab + 前台窗口看门狗）
+       */
+      'focus.strictMode': boolean
+
+      /**
+       * 违规时终止对方进程。
+       *
+       * 默认关闭：直接杀进程会丢失未保存的工作，是破坏性操作，
+       * 关闭时只把违规窗口最小化并记一次违规。
+       */
+      'focus.killOnViolation': boolean
+
+      /**
+       * 解锁码（仅本机保存）
+       */
+      'focus.unlockCode': string
+
+      /**
+       * 专注段自动播放的列表 id，空字符串表示不改变播放状态
+       */
+      'focus.focusListId': string
+
+      /**
+       * 休息段自动播放的列表 id，空字符串表示暂停音乐
+       */
+      'focus.breakListId': string
+
+      /**
+       * 违规时是否淡出音乐作为提醒
+       */
+      'focus.reactOnViolation': boolean
     }
   }
 

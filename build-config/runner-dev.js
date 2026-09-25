@@ -1,5 +1,13 @@
 process.env.NODE_ENV = 'development'
 
+/*
+ * 从 Electron 系 IDE（VS Code / CodeBuddy 等）的集成终端里启动本脚本时，
+ * 环境里往往带着 ELECTRON_RUN_AS_NODE=1。它会让 electron.exe 退化成纯 Node：
+ * 主进程随即报 “Not running in an Electron environment!” 而启动失败，
+ * 且错误现场看着像项目代码问题，极难排查。这里直接清掉，别让它传下去。
+ */
+delete process.env.ELECTRON_RUN_AS_NODE
+
 const chalk = require('chalk')
 const electron = require('electron')
 const path = require('path')

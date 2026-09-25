@@ -20,8 +20,6 @@ const defaultSetting: LX.AppSetting = {
   'common.controlBtnPosition': isMac ? 'left' : 'right',
   'common.playBarProgressStyle': 'mini',
   'common.transparentWindow': !isMac,
-  'common.tryAutoUpdate': true,
-  'common.showChangeLog': true,
 
   'player.startupAutoPlay': false,
   'player.togglePlayMethod': 'listLoop',
@@ -156,6 +154,17 @@ const defaultSetting: LX.AppSetting = {
 
   'odc.isAutoClearSearchInput': false,
   'odc.isAutoClearSearchList': false,
+
+  'focus.focusMinutes': 25,
+  'focus.breakMinutes': 5,
+  'focus.rounds': 4,
+  'focus.taskName': '',
+  'focus.strictMode': true,
+  'focus.killOnViolation': false,
+  'focus.unlockCode': '',
+  'focus.focusListId': '',
+  'focus.breakListId': '',
+  'focus.reactOnViolation': true,
 
 }
 

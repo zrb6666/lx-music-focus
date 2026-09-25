@@ -1,6 +1,7 @@
 // const fs = require('fs')
 // const fsPromises = require('fs').promises
-// const path = require('path')
+const path = require('path')
+const { spawnSync } = require('child_process')
 const { Arch } = require('electron-builder')
 // const nodeAbi = require('node-abi')
 const { beforePack, copyLib } = require('./deps')
@@ -30,7 +31,23 @@ const archMap = {
   [Arch.arm64]: 'arm64',
   [Arch.armv7l]: 'arm',
 }
+/**
+ * 打包前先把 C# 原生辅助进程编译出来。
+ *
+ * 放在这里而不是 npm 脚本里，是为了保证「无论是 npm run pack 还是直接调
+ * build-pack.js」都不会漏掉这一步——漏掉的话 extraResources 会指向空目录，
+ * 用户装完会发现 Win 键拦不住，且没有任何提示。
+ */
+const buildNativeGuard = () => {
+  const script = path.join(__dirname, '../scripts/build-native-guard.mjs')
+  const result = spawnSync(process.execPath, [script], { stdio: 'inherit' })
+  if (result.status !== 0) {
+    throw new Error('原生辅助进程编译失败，已中止打包（可单独运行 npm run build:native-guard 排查）')
+  }
+}
+
 module.exports = async(context) => {
+  buildNativeGuard()
   await beforePack()
   const { arch } = context
   const electronVersion = context.packager?.info?._framework?.version ?? require('../package.json').devDependencies.electron.replace(/^[^\d]*?(\d+)/, '$1')

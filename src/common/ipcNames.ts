@@ -61,14 +61,6 @@ const modules = {
 
     player_status: 'player_status',
     change_tray: 'change_tray',
-    quit_update: 'quit_update',
-    update_check: 'update_check',
-    update_download_update: 'update_download_update',
-    update_available: 'update_available',
-    update_error: 'update_error',
-    update_progress: 'update_progress',
-    update_downloaded: 'update_downloaded',
-    update_not_available: 'update_not_available',
     set_ignore_mouse_events: 'set_ignore_mouse_events',
     set_window_size: 'set_window_size',
 
@@ -169,6 +161,14 @@ const modules = {
     status: 'status',
     set_config: 'set_config',
   },
+  focusGuard: {
+    engage: 'engage',
+    disengage: 'disengage',
+    get_report: 'get_report',
+    violation: 'violation',
+    toast: 'toast',
+    native_lost: 'native_lost',
+  },
 }
 
 
@@ -193,3 +193,4 @@ export const DISLIKE_EVENT_NAME = modules.dislike
 export const WIN_MAIN_RENDERER_EVENT_NAME = modules.winMain
 export const WIN_LYRIC_RENDERER_EVENT_NAME = modules.winLyric
 export const HOTKEY_RENDERER_EVENT_NAME = modules.hotKey
+export const FOCUS_GUARD_RENDERER_EVENT_NAME = modules.focusGuard

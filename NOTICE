@@ -1,0 +1,91 @@
+LX Focus
+========
+
+Copyright 2026 LX Focus contributors
+
+This product is a modified fork of LX Music Desktop.
+衍生自 LX Music Desktop（lx-music-desktop）。
+
+Upstream project / 上游项目:
+  LX Music Desktop
+  Copyright 2021 lyswhut
+  https://github.com/lyswhut/lx-music-desktop
+  Licensed under the Apache License, Version 2.0
+
+依据 Apache License 2.0 第 4 条 b 款的要求，以下说明本 fork 相对上游所做的修改。
+
+Modifications / 修改声明
+------------------------
+
+1. 新增「专注」模块（Focus）
+   - src/renderer/views/Focus/index.vue        专注界面：环形计时、预设时长、统计图表、会话记录
+   - src/renderer/store/focus/index.ts         会话状态机、音乐联动、拦截层对接、数据落盘
+   - src/main/modules/focus/                   主进程侧的窗口与系统级约束（kiosk、置顶、失焦夺回）
+   - src/main/modules/focus/nativeGuard.ts     与原生辅助进程的 stdio 桥
+   - native/LxFocusGuard.cs                    Windows 原生辅助进程：低级键盘钩子 + 前台窗口看门狗
+   - scripts/build-native-guard.mjs            编译上述辅助进程
+   - src/common/types/focus.d.ts               相关类型声明
+
+2. 路由与导航
+   - src/renderer/router.ts                    新增 /focus 路由，并将其作为默认落地页
+   - src/renderer/components/layout/Aside/NavBar.vue   新增「专注」入口
+   - src/renderer/components/layout/Icons.vue  新增图标
+
+3. 设置项
+   - src/common/types/app_setting.d.ts         新增 focus.* 系列设置
+   - src/common/defaultSetting.ts              对应的默认值
+
+4. 品牌与身份
+   - package.json                              应用名、描述、版本改为 LX Focus
+   - build-config/build-pack.js                appId / productName / 快捷方式名改为本项目
+                                               移除上游的 legalTrademarks 声明
+   - src/common/utils/renderer.ts              窗口标题默认值
+   - src/renderer/index.html, src/renderer-lyric/index.html  页面标题
+
+5. 构建
+   - build-config/build-pack.js                新增 extraResources 以打包原生辅助进程
+   - build-config/build-before-pack.js         打包前编译原生辅助进程
+   - build-config/build-pack.js                关闭 npmRebuild（见下方第 7 条）
+   - src/main/types/common.d.ts                注册 focus 类型
+   - src/renderer/types/common.d.ts            同上
+   - src/common/ipcNames.ts                    新增 focusGuard IPC 事件组
+   - src/main/modules/index.ts                 注册专注拦截模块
+
+6. 移除应用内的自动更新能力
+   上游在源码内铺设了多个指向自身的版本信息端点、更新弹窗与发布页链接。fork 若原样沿用，
+   使用者会在本 fork 内被提示「有新版本 v2.12.x」并被引导下载**上游的**安装包，
+   既属错误行为，也会污染本 fork 的版本线。与其把这些链接逐个改写指向，本 fork 选择
+   删除整条更新链路 —— 新版本一律手动下载覆盖安装：
+   - src/main/modules/winMain/autoUpdate.ts               已删除（原注册 autoUpdater 事件与 IPC）
+   - src/renderer/core/useApp/useUpdate.ts                已删除（更新状态机与更新日志判定）
+   - src/renderer/utils/update.js                         已删除（版本信息端点与回退版本号）
+   - src/renderer/components/layout/UpdateModal.vue       已删除
+   - src/renderer/components/layout/ChangeLogModal.vue    已删除
+   - src/renderer/views/Setting/components/SettingUpdate.vue  已删除
+   - src/common/ipcNames.ts                              移除 update_* 事件名与 quit_update
+   - src/common/defaultSetting.ts / app_setting.d.ts      移除 common.tryAutoUpdate / common.showChangeLog
+   - src/common/constants.ts                             移除 DATA_KEYS.ignoreVersion
+   - src/common/types/common.d.ts                        移除 UpdateStatus / VersionInfo 类型
+   - src/renderer/store/index.ts                          移除 versionInfo / isShowChangeLog
+   - src/lang/*.json                                      移除 update__* 与 setting__update* 文案
+   - src/renderer/components/layout/PactModal.vue         不再在同意协议后触发检查更新
+   - src/renderer/App.vue                                 不再挂载更新弹窗与更新日志弹窗
+   - build-config/build-pack.js                           不再配置 publish；
+                                                          新增 removeUpdateMetadata() 清理产物目录下的 latest.yml
+   - build-config/build-after-pack.js                     新增兜底：删除产物内 resources/app-update.yml
+   - package.json                                         移除 electron-updater 依赖
+   其余外部链接改为指向本 fork 自身：
+   - src/renderer/views/Setting/components/SettingAbout.vue   开源地址 / 下载地址 / Issue 链接
+   - src/main/utils/winLegacy.ts               旧版 Windows 提示的跳转地址
+   上游文档站（lyswhut.github.io/lx-music-doc）与上游 issue 编号的引用**有意保留**：
+   前者是本 fork 未自建文档前的有效帮助入口，后者是代码来源的溯源标注。
+
+7. 关闭 electron-builder 的 npmRebuild
+   - build-config/build-pack.js
+   本项目依赖的三个原生模块（better-sqlite3 v13、bufferutil v4.1.0、utf-8-validate v6.0.6）
+   全部为 N-API 模块并自带 prebuilds，ABI 在 Node 与 Electron 之间通用，无需按 Electron
+   重编。而上游的默认配置会调用 @electron/rebuild → node-gyp，把「本机装有 Visual Studio」
+   变成打包的前置条件。关闭后打包不再需要 C++ 工具链。
+
+未修改的部分仍为上游作品，其著作权归 lyswhut 及各位贡献者所有。
+LX Music Desktop 的名称与标识不属于本 fork，本 fork 亦不主张任何相关权利。

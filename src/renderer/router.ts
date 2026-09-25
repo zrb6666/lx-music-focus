@@ -7,6 +7,14 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {
+      path: '/focus',
+      name: 'Focus',
+      component: require('./views/Focus/index.vue').default,
+      meta: {
+        name: 'Focus',
+      },
+    },
+    {
       path: '/search',
       name: 'Search',
       component: require('./views/Search/index.vue').default,
@@ -62,7 +70,7 @@ const router = createRouter({
         name: 'Setting',
       },
     },
-    { path: '/:pathMatch(.*)*', redirect: '/search' },
+    { path: '/:pathMatch(.*)*', redirect: '/focus' },
   ],
   linkActiveClass: 'active-link',
   linkExactActiveClass: 'exact-active-link',

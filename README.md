@@ -1,167 +1,164 @@
-<p align="center"><a href="https://github.com/lyswhut/lx-music-desktop"><img width="200" src="https://github.com/lyswhut/lx-music-desktop/blob/master/doc/images/icon.png" alt="lx-music logo"></a></p>
-
-<h1 align="center">LX Music 桌面版</h1>
+<h1 align="center">LX Focus</h1>
 
 <p align="center">
-  <a href="https://github.com/lyswhut/lx-music-desktop/releases"><img src="https://img.shields.io/github/release/lyswhut/lx-music-desktop" alt="Release version"></a>
-  <a href="https://github.com/lyswhut/lx-music-desktop/actions/workflows/release.yml"><img src="https://github.com/lyswhut/lx-music-desktop/workflows/Build/badge.svg" alt="Build status"></a>
-  <a href="https://github.com/lyswhut/lx-music-desktop/actions/workflows/beta-pack.yml"><img src="https://github.com/lyswhut/lx-music-desktop/workflows/Build%20Beta/badge.svg" alt="Build status"></a>
-  <a href="https://electronjs.org/releases/stable"><img src="https://img.shields.io/github/package-json/dependency-version/lyswhut/lx-music-desktop/dev/electron/master" alt="Electron version"></a>
-  <!-- <a href="https://github.com/lyswhut/lx-music-desktop/releases"><img src="https://img.shields.io/github/downloads/lyswhut/lx-music-desktop/latest/total" alt="Downloads"></a> -->
-  <a href="https://github.com/lyswhut/lx-music-desktop/tree/dev"><img src="https://img.shields.io/github/package-json/v/lyswhut/lx-music-desktop/dev" alt="Dev branch version"></a>
-  <!-- <a href="https://github.com/lyswhut/lx-music-desktop/blob/master/LICENSE"><img src="https://img.shields.io/github/license/lyswhut/lx-music-desktop" alt="License"></a> -->
+  把「专注锁」和「音乐播放」做成同一件事的桌面工具。
 </p>
 
-<!-- [![GitHub release][1]][2]
-[![Build status][3]][4]
-[![GitHub Releases Download][5]][6]
-[![dev branch][7]][8]
-[![GitHub license][9]][10] -->
+---
 
-<!-- [1]: https://img.shields.io/github/release/lyswhut/lx-music-desktop
-[2]: https://github.com/lyswhut/lx-music-desktop/releases
-[3]: https://ci.appveyor.com/api/projects/status/flrsqd5ymp8fnte5?svg=true
-[4]: https://ci.appveyor.com/project/lyswhut/lx-music-desktop
-[5]: https://img.shields.io/github/downloads/lyswhut/lx-music-desktop/latest/total
-[5]: https://img.shields.io/github/downloads/lyswhut/lx-music-desktop/total
-[6]: https://github.com/lyswhut/lx-music-desktop/releases
-[7]: https://img.shields.io/github/package-json/v/lyswhut/lx-music-desktop/dev
-[8]: https://github.com/lyswhut/lx-music-desktop/tree/dev
-[9]: https://img.shields.io/github/license/lyswhut/lx-music-desktop
-[10]: https://github.com/lyswhut/lx-music-desktop/blob/master/LICENSE -->
+## 这是什么
 
-<p align="center">一个基于 Electron & Vue 开发的音乐软件</p>
+LX Focus 是一个基于 [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop) 二次开发的桌面应用。
 
-## 说明
+它在上游的音乐播放能力之上，加了一个**专注模块**：设定好时长和目标，进入专注后应用会接管窗口与系统层的交互，让你很难随手切走去干别的；专注期间自动播放你指定的歌单，休息时切换成另一套歌单或直接静音；每一次专注的时长、完成情况和「走神次数」都会被如实记录下来。
 
-所用技术栈：
+一句话概括设计取向：**把分心的摩擦成本抬高，而不是造一个不可破解的笼子。**
 
-- Electron 30+
-- Vue 3
+## 上游与许可
 
-已支持的平台：
+| | |
+|---|---|
+| 上游项目 | [LX Music 桌面版](https://github.com/lyswhut/lx-music-desktop) |
+| 上游作者 | lyswhut 及各位贡献者 |
+| 许可证 | Apache License 2.0 |
 
-- Linux
-- macOS
-- Windows 7 及以上
+本项目是上游的修改版，依据 Apache License 2.0 第 4 条 b 款，**修改声明见 [NOTICE](./NOTICE)**。
 
-*移动版项目地址：https://github.com/lyswhut/lx-music-mobile*
+LX Music 的名称与标识不属于本项目，本项目也不主张任何相关权利。上游的完整使用协议与免责声明保留在 [`licenses/`](./licenses) 目录中，未作改动，使用前请一并阅读。
 
-> [!NOTE]
-> 目前新项目 [Any Listen](https://github.com/any-listen/any-listen) 的桌面版、Web 版已实现 LX Music 的大部分功能，并额外支持 WebDAV 歌曲播放、WebDAV 数据同步、独立播放列表等功能。
-> 我们以后的开发精力将主要集中在新项目上，之前大家在 LX Music 提的功能我们也会考虑在新项目中添加。
-> 对于日常使用 LX Music 的人可以试试迁移到 Any Listen，若遇到任何问题可以发 issue 反馈。
+> **能力边界**：本项目自身不含任何音乐源。在线播放能力来自使用者在「自定义源」中自行导入的音源脚本，与上游行为一致。
 >
-> 关于我们开发新项目的原因，可以参考：[LX Music 项目发展调整与新项目计划](https://github.com/lyswhut/lx-music-desktop/issues/1912)。
+> **使用限制**（摘自上游协议，继续适用）：禁止在违反当地法律法规的情况下使用本项目；音乐平台不易，请尊重版权、支持正版。
 
-软件变化请查看[更新日志](https://github.com/lyswhut/lx-music-desktop/blob/master/CHANGELOG.md)。
+## 专注模块做了什么
 
-软件下载请查看 [GitHub Releases](https://github.com/lyswhut/lx-music-desktop/releases)。
+### 专注界面（`/focus`）
 
-使用常见问题请参阅[桌面版常见问题](https://lyswhut.github.io/lx-music-doc/desktop/faq)。
+- 环形计时器，预设 15 / 25 / 45 / 60 / 90 分钟，也可以手填
+- 多轮循环：专注 → 休息 → 专注，轮数与休息时长均可配置
+- 7 天专注时长柱状图、今日汇总、最近会话列表
 
-目前本项目的原始发布地址只有 [**GitHub**](https://github.com/lyswhut/lx-music-desktop/releases)，其他渠道均为第三方转载发布，与本项目无关！
+### 专注锁
 
-为了提高使用门槛，本软件内的默认设置、UI 操作不以新手友好为目标，所以使用前建议先根据你的喜好浏览调整一遍软件设置，阅读一遍[音乐播放列表机制](https://lyswhut.github.io/lx-music-doc/desktop/faq/playlist)及[可用的鼠标、键盘快捷操作](https://lyswhut.github.io/lx-music-doc/desktop/faq/hotkey)。
+分四层，逐层增强，越往下对系统的侵入越深：
 
-### Scheme URL 支持
+| 层 | 手段 | 依赖 |
+|---|---|---|
+| 1. 窗口层 | kiosk 全屏独占、屏幕级置顶、失焦自动夺回 | Electron |
+| 2. 快捷键层 | 屏蔽 Alt+F4 / Ctrl+W / F11 / Ctrl+Shift+I | Electron `globalShortcut` |
+| 3. 进程层 | 低级键盘钩子吞掉 Win 键与 Alt+Tab；前台窗口看门狗 | `native/LxFocusGuard.exe` |
+| 4. 意志层 | 暂停 / 结束需要解锁码 | 应用内 |
 
-从 v1.17.0 起支持 Scheme URL，可以使用此功能在浏览器等场景下调用 LX Music，我们开发了一个[油猴脚本](https://github.com/lyswhut/lx-music-script#readme)配套使用。
+第 3 层需要一个随包分发的 Windows 原生辅助进程。它是个纯用户态程序，不装驱动、不需要管理员权限。构建方式：
 
-脚本安装地址：[LX Music 辅助脚本](https://greasyfork.org/zh-CN/scripts/438148)。
+```bash
+npm run build:native-guard     # 用系统自带的 csc.exe 编译，无需 Visual Studio
+npm run pack                   # 打包时会自动调用上一步
+```
 
-若你想自己调用 LX Music，可以参考文档「[Scheme URL 支持](https://lyswhut.github.io/lx-music-doc/desktop/scheme-url)」部分。
+### 关于「无法防护」的部分
 
-### 数据同步服务
+这些不是缺陷，而是操作系统的边界，应用会**如实告知**而不是假装自己封死了一切：
 
-从 v2.2.0 起，我们发布了一个独立的[数据同步服务](https://github.com/lyswhut/lx-music-sync-server#readme)。如果你有服务器，可以将其部署到服务器上作为私人多端同步服务使用，详情看该项目说明。
+- `Ctrl+Alt+Del` 是安全注意序列（SAS），由内核接管，任何用户态程序都无法拦截
+- 通过任务管理器强行结束进程 —— 系统保留的逃生通道
+- 安全模式重启
 
-### 开放 API 支持
+专注界面里会实打实地列出「已生效」与「无法防护」两组项目。
 
-从 v2.7.0 起支持开放 API 服务。启用该功能后，将会在本地启动一个 HTTP 服务，提供播放器相关的接口供第三方软件调用，详情看文档「[开放 API 服务](https://lyswhut.github.io/lx-music-doc/desktop/open-api)」部分。
+### 违规时的反应
 
-### 数据存储目录
+默认只是把跑到前台的其他窗口**最小化**，并记一次违规，同时让音乐淡出静默 6 秒作为提醒。
 
-默认情况下，软件的数据存储在：
+「直接结束违规进程」是一个**单独的、默认关闭**的开关。开着它确实更狠，但会丢失对方程序里未保存的内容，所以必须由使用者显式开启，界面上也标了危险提示。
 
-- Linux：`$XDG_CONFIG_HOME/lx-music-desktop` 或 `~/.config/lx-music-desktop`
-- macOS：`~/Library/Application Support/lx-music-desktop`
-- Windows：`%APPDATA%/lx-music-desktop`
+### 数据
 
-在 Windows 平台上，若程序文件夹中存在 `portable` 文件夹，则自动使用此文件夹作为数据存储文件夹（适用于 v1.17.0 及以上版本）。
+会话记录保存在本机，不联网、不上传。解锁码只做本地散列比对 —— 它是一道「自我承诺」的缓冲，**不是安全边界**。忘记了解锁码，直接改配置里的 `focus.unlockCode` 即可重置。这是刻意留的出口：任何自律工具都不该让使用者把自己锁死在软件里。
 
-## 用户界面
+## 开发
 
-<p><img width="100%" src="./doc/images/app.png" alt="lx-music desktop UI"></p>
+```bash
+npm install --ignore-scripts   # 原因见下方说明
+npm run build:native-guard     # 编译原生辅助进程（仅 Windows 需要）
+npm run dev
+```
 
-## 贡献代码
+### 关于 `--ignore-scripts`
 
-本项目欢迎 PR，但为了 PR 能顺利合并，需要注意以下几点：
+`better-sqlite3` 的 postinstall 会尝试用 node-gyp 重新编译原生模块，在没装 Visual Studio 的机器上会失败并**中断整个安装**，导致 Electron 二进制等后续步骤被静默跳过。
 
-- 对于添加新功能的 PR，建议在提交 PR 前先创建 Issue 进行说明，以确认该功能是否确实需要。
-- 对于修复 bug 的 PR，请提供修复前后的说明及重现方式。
-- 对于其他类型的 PR，则适当附上说明。
+实际上该模块自带 N-API 预编译件（`prebuilds/`），ABI 在 Node 与 Electron 之间稳定，不需要本地编译。因此跳过 install 脚本即可，装完后补一下 Electron 二进制：
 
-贡献代码步骤：
+```bash
+cd node_modules/electron
+ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node install.js
+```
 
-1. 参照[源码使用方法](https://lyswhut.github.io/lx-music-doc/desktop/use-source-code)设置开发环境；
-2. 克隆本仓库代码并切换至 `dev` 分支进行开发；
-3. 提交 PR 至 `dev` 分支。
+### 打包
 
-## 源码使用方法
+```bash
+npm run pack:win:7z:x64        # Windows 免安装版
+npm run pack:win:setup:x64     # Windows 安装包
+```
 
-请参阅：<https://lyswhut.github.io/lx-music-doc/desktop/use-source-code>
+产物落在 `build/`：
 
-## 项目协议
+| 文件 | 说明 |
+|---|---|
+| `lx-focus-v0.1.0-win_x64-green.7z` | 免安装绿色版，解压即用，适合随 GitHub Release 分发 |
+| `lx-focus-v0.1.0-x64-Setup.exe` | NSIS 安装包，可选安装目录（`oneClick: false`） |
 
-本项目基于 [Apache License 2.0](https://github.com/lyswhut/lx-music-desktop/blob/master/LICENSE) 许可证发行，以下协议是对于 Apache License 2.0 的补充，如有冲突，以以下协议为准。
+打包配置已把 `appId` / `productName` 与上游脱钩 —— 沿用上游的 appId 会让两个应用共用同一份用户数据目录并互相覆盖配置。
 
----
+打包**不需要 Visual Studio**。本项目依赖的三个原生模块全部是 N-API 模块并自带 `prebuilds/`，ABI 在 Node 与 Electron 之间通用，因此 `build-config/build-pack.js` 里关掉了 electron-builder 默认的 `npmRebuild`。上游的默认配置会调 `@electron/rebuild` → `node-gyp`，把「本机装有 C++ 生成工具」变成打包前置条件，而这对本项目是纯粹的额外负担。
 
-*词语约定：本协议中的“本项目”指 LX Music（洛雪音乐助手）桌面版项目；“使用者”指签署本协议的使用者；“官方音乐平台”指对本项目内置的包括酷我、酷狗、咪咕等音乐源的官方平台统称；“版权数据”指包括但不限于图像、音频、名字等在内的他人拥有所属版权的数据。*
+`build-config/build-pack.js` 已不再配置 `publish`，因此不存在需要替换的 `publish.owner` 占位值。仓库坐标只由 `package.json` 的 `author.name` 决定，见下文「发布前要改的一处」。
 
-### 一、数据来源
+### 关于更新
 
-1.1 本项目的各官方平台在线数据来源原理是从其公开服务器中拉取数据（与未登录状态在官方平台 APP 获取的数据相同），经过对数据简单地筛选与合并后进行展示，因此本项目不对数据的合法性、准确性负责。
+**本项目已移除应用内的检查更新、下载更新与更新日志能力。** 具体表现为：
 
-1.2 本项目本身没有获取某个音频数据的能力，本项目使用的在线音频数据来源来自软件设置内“自定义源”设置所选择的“源”返回的在线链接。例如播放某首歌，本项目所做的只是将希望播放的歌曲名、艺术家等信息传递给“源”，若“源”返回了一个链接，则本项目将认为这就是该歌曲的音频数据而进行使用，至于这是不是正确的音频数据本项目无法校验其准确性，所以使用本项目的过程中可能会出现希望播放的音频与实际播放的音频不对应或者无法播放的问题。
+- 设置页没有「软件更新」入口，不会弹出更新提示，也不会出现「更新失败」这类误报
+- 依赖中已去掉 `electron-updater`，相关的 IPC 事件名、store 状态与组件一并删除
+- 打包产物里不再留有更新元数据：`resources/app-update.yml` 与产物目录下的 `latest.yml` 都会被清掉
 
-1.3 本项目的非官方平台数据（例如“我的列表”内列表）来自使用者本地系统或者使用者连接的同步服务，本项目不对这些数据的合法性、准确性负责。
+需要说明的是，**「不配置 `publish`」并不足以让 electron-builder 停止生成这两样东西**：当 `publish` 为 `null` 或未配置时，`getPublishConfigsForUpdateInfo()` 会退回用 `package.json` 的 `repository` 推导出一份 github provider 配置照常写盘。两者写入时机不同，因此清理位置也不同：
 
-### 二、版权数据
+| 文件 | 写入者 | 清理位置 |
+| --- | --- | --- |
+| `resources/app-update.yml` | electron-builder 内部的 `onAfterPack` 监听器 | `build-config/build-after-pack.js` 的 `afterPack` 钩子（跑在该监听器之后、NSIS / 7z 取件之前，所以产物里也不会带） |
+| `latest.yml` | `publishManager.awaitTasks()` → `writeUpdateInfoFiles()` | `build-config/build-pack.js` 的 `removeUpdateMetadata()`（在 `await builder.build()` 兑现之后） |
 
-2.1 使用本项目的过程中可能会产生版权数据。对于这些版权数据，本项目不拥有它们的所有权。为了避免侵权，使用者务必在 **24 小时内** 清除使用本项目的过程中所产生的版权数据。
+`latest.yml` 的时序容易踩坑：它由 `builder.build()` 的 `executeFinally` 收尾阶段写出，比 `afterAllArtifactBuild` 钩子还晚 —— 在钩子里删只会删个空气，因为文件当时还没生成。
 
-### 三、音乐平台别名
+新版本一律手动下载覆盖安装，或到「关于」页点开源地址自行获取。
 
-3.1 本项目内的官方音乐平台别名为本项目内对官方音乐平台的一个称呼，不包含恶意。如果官方音乐平台觉得不妥，可联系本项目更改或移除。
+上游的 `publish/` 目录（生成 `version.json` 的发布脚本）保留着，它只是发布工具、与运行时无关 —— 客户端已不再读取该文件。
 
-### 四、资源使用
+### 发布前要改的一处
 
-4.1 本项目内使用的部分包括但不限于字体、图片等资源来源于互联网。如果出现侵权可联系本项目移除。
+**联系邮箱**：`package.json` 的 `author.email` 目前是 `CHANGE_ME@example.com` 占位值。仓库坐标（`repository` / `bugs` / `homepage`）已指向本 fork 的 GitHub 仓库，`author.name` 使用项目名 `LX Focus`，两者都不含个人信息，无需改动。
 
-### 五、免责声明
+`author.name` 同时决定「关于」页里开源地址、Releases 地址、Issue 链接的推导结果 —— 由于它现在是项目名而非账号名，这些链接由 `repository` 字段提供，改仓库地址时改 `repository` 即可。
 
-5.1 由于使用本项目产生的包括由于本协议或由于使用或无法使用本项目而引起的任何性质的任何直接、间接、特殊、偶然或结果性损害（包括但不限于因商誉损失、停工、计算机故障或故障引起的损害赔偿，或任何及所有其他商业损害或损失）由使用者负责。
+## 目录结构（本项目新增部分）
 
-### 六、使用限制
+```
+src/renderer/views/Focus/index.vue          专注界面
+src/renderer/store/focus/index.ts           会话状态机、音乐联动、数据落盘
+src/main/modules/focus/index.ts             专注拦截模块入口与 IPC
+src/main/modules/focus/guard.ts             窗口层 / 快捷键层 / 进程层编排
+src/main/modules/focus/nativeGuard.ts       与原生辅助进程的 stdio 桥
+native/LxFocusGuard.cs                      Windows 原生辅助进程
+scripts/build-native-guard.mjs              编译辅助进程
+src/common/types/focus.d.ts                 类型声明
+NOTICE                                      修改声明
+```
 
-6.1 本项目完全免费，且开源发布于 GitHub 面向全世界人用作对技术的学习交流。本项目不对项目内的技术可能存在违反当地法律法规的行为作保证。
+## 已知不足
 
-6.2 **禁止在违反当地法律法规的情况下使用本项目。** 对于使用者在明知或不知当地法律法规不允许的情况下使用本项目所造成的任何违法违规行为由使用者承担，本项目不承担由此造成的任何直接、间接、特殊、偶然或结果性责任。
-
-### 七、版权保护
-
-7.1 音乐平台不易，请尊重版权，支持正版。
-
-### 八、非商业性质
-
-8.1 本项目仅用于对技术可行性的探索及研究，不接受任何商业（包括但不限于广告等）合作及捐赠。
-
-### 九、接受协议
-
-9.1 若你使用了本项目，即代表你接受本协议。
-
----
-
-若对此有疑问请 mail to: lyswhut+qq.com (请将 `+` 替换为 `@`)
+- 原生辅助进程目前只有 Windows 实现；macOS / Linux 上专注锁降级为窗口层 + 快捷键层
+- 界面文案目前只有中文，尚未接入上游的 i18n 体系
+- 应用图标仍是上游资源，尚未替换
+- **32 位打包有静默降级的风险**：`better-sqlite3` 的 `prebuilds/` 里没有 `win32-ia32`，而 `deps.copyLib` 找不到预编译件时只打印一行日志就返回，随后打进包里的是上一次留下的 `build/Release/better_sqlite3.node`（通常是 x64）。若要发布 32 位版本，请先确认包内该文件确实是 ia32，或干脆只发 x64。

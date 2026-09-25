@@ -1,6 +1,5 @@
 import { rendererSend, rendererInvoke, rendererOn, rendererOff } from '@common/rendererIpc'
 import { HOTKEY_RENDERER_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, CMMON_EVENT_NAME } from '@common/ipcNames'
-import { type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
 import { markRaw } from '@common/utils/vueTools'
 import * as hotKeys from '@common/hotKey'
 import { APP_EVENT_NAMES, DATA_KEYS, DEFAULT_SETTING } from '@common/constants'
@@ -72,54 +71,6 @@ export const onDeeplink = (listener: LX.IpcRendererEventListenerParams<string>):
     rendererOff(CMMON_EVENT_NAME.deeplink, listener)
   }
 }
-
-export const checkUpdate = () => {
-  rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.update_check)
-}
-
-export const downloadUpdate = () => {
-  rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.update_download_update)
-}
-
-export const quitUpdate = () => {
-  rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.quit_update)
-}
-
-export const onUpdateAvailable = (listener: LX.IpcRendererEventListenerParams<UpdateInfo>): RemoveListener => {
-  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_available, listener)
-  return () => {
-    rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_available, listener)
-  }
-}
-
-export const onUpdateError = (listener: LX.IpcRendererEventListenerParams<string>): RemoveListener => {
-  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_error, listener)
-  return () => {
-    rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_error, listener)
-  }
-}
-
-export const onUpdateProgress = (listener: LX.IpcRendererEventListenerParams<ProgressInfo>): RemoveListener => {
-  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, listener)
-  return () => {
-    rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, listener)
-  }
-}
-
-export const onUpdateDownloaded = (listener: LX.IpcRendererEventListenerParams<UpdateDownloadedEvent>): RemoveListener => {
-  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_downloaded, listener)
-  return () => {
-    rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_downloaded, listener)
-  }
-}
-
-export const onUpdateNotAvailable = (listener: LX.IpcRendererEventListenerParams<UpdateInfo>): RemoveListener => {
-  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, listener)
-  return () => {
-    rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.update_not_available, listener)
-  }
-}
-
 
 export const importUserApi = async(fileText: string) => {
   return rendererInvoke<string, LX.UserApi.ImportUserApi>(WIN_MAIN_RENDERER_EVENT_NAME.import_user_api, fileText)
@@ -245,17 +196,6 @@ export const saveListUpdateInfo = (listPosition: LX.List.ListUpdateInfo) => {
 // 获取列表更新记录
 export const getListUpdateInfo = async() => {
   return rendererInvoke<string, LX.List.ListUpdateInfo | null>(WIN_MAIN_RENDERER_EVENT_NAME.get_data, DATA_KEYS.listUpdateInfo)
-}
-
-export const saveIgnoreVersion = (version: string) => {
-  rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.save_data, {
-    path: DATA_KEYS.ignoreVersion,
-    data: version,
-  })
-}
-// 获取忽略更新的版本号
-export const getIgnoreVersion = async() => {
-  return rendererInvoke<string, string | null>(WIN_MAIN_RENDERER_EVENT_NAME.get_data, DATA_KEYS.ignoreVersion)
 }
 
 export const saveLeaderboardSetting = (source: typeof DEFAULT_SETTING['leaderboard']) => {

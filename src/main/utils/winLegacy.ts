@@ -4,7 +4,11 @@ import { dialog } from 'electron'
 import { STORE_NAMES } from '@common/constants'
 import getStore from '@main/utils/store'
 import { openUrl } from '@common/utils/electron'
+import pkg from '../../../package.json'
 
+
+// 本项目自己的发布页地址，由 package.json 推导，避免硬编码上游地址
+const releasesUrl = `https://github.com/${pkg.author?.name ?? ''}/${pkg.name}/releases`
 
 const showWinLegacyMessage = () => {
   if (process.platform !== 'win32') return
@@ -34,7 +38,8 @@ const showWinLegacyMessage = () => {
       buttons: ['跳转新版发布页', '知道了'],
     })
     if (result === 0) {
-      void openUrl('https://github.com/lyswhut/lx-music-desktop/releases')
+      // 指向本项目的发布页；这里若沿用上游地址会把用户引到上游发行版
+      void openUrl(releasesUrl)
     } else if (result === 1) {
       dataStore.set('winLegacyMessageShown', count + 1)
     }

@@ -39,7 +39,6 @@
         <SettingOdc />
         <SettingBackup />
         <SettingOther />
-        <SettingUpdate />
         <SettingAbout /> -->
       </dl>
     </div>
@@ -66,7 +65,6 @@ import SettingNetwork from './components/SettingNetwork.vue'
 import SettingOdc from './components/SettingOdc.vue'
 import SettingBackup from './components/SettingBackup.vue'
 import SettingOther from './components/SettingOther.vue'
-import SettingUpdate from './components/SettingUpdate.vue'
 import SettingAbout from './components/SettingAbout.vue'
 
 export default {
@@ -86,7 +84,6 @@ export default {
     SettingOdc,
     SettingBackup,
     SettingOther,
-    SettingUpdate,
     SettingAbout,
   },
   setup() {
@@ -111,7 +108,6 @@ export default {
         { id: 'SettingOdc', title: t('setting__odc') },
         { id: 'SettingBackup', title: t('setting__backup') },
         { id: 'SettingOther', title: t('setting__other') },
-        { id: 'SettingUpdate', title: t('setting__update') },
         { id: 'SettingAbout', title: t('setting__about') },
       ]
     })

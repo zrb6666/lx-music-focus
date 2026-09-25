@@ -46,7 +46,7 @@ import migrateSetting from '@common/utils/migrateSetting'
 
 
 export default {
-  name: 'SettingUpdate',
+  name: 'SettingBackup',
   setup() {
     const t = useI18n()
     // const setting = useRefGetter('setting')

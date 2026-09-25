@@ -71,3 +71,12 @@ publish/assets
 publish/utils/githubToken.js
 
 src/**/*-internal.js
+
+# 打包产物（发布时手动上传到 GitHub Release，不入库）
+release
+build-prev
+
+# 原生辅助进程的编译产物：打包时由 build-before-pack.js → scripts/build-native-guard.mjs
+# 从 native/LxFocusGuard.cs 现场编译生成，不入库（保留目录结构与 .gitkeep）
+native/bin/*
+!native/bin/.gitkeep
