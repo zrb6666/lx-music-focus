@@ -1,5 +1,5 @@
 <template>
-  <div class="focus-view">
+  <div class="focus-view" :class="{ 'is-running': running }">
     <!-- 左：计时器与防护状态 -->
     <div class="fv-col fv-left">
       <div class="fv-card fv-timer-card" :class="[phaseClass, { 'is-live': isLive }]">
@@ -14,34 +14,40 @@
             </defs>
             <!-- 轨道 -->
             <circle cx="150" cy="150" :r="RADIUS" fill="none" stroke="var(--color-primary-alpha-800)" stroke-width="10" />
-            <!-- 光晕：与进度同形，粗而淡，负责「发光」的观感 -->
-            <circle
-              cx="150"
-              cy="150"
-              :r="RADIUS"
-              fill="none"
-              :stroke="ringStroke"
-              stroke-width="24"
-              stroke-linecap="round"
-              :stroke-dasharray="CIRCUMFERENCE"
-              :stroke-dashoffset="dashOffset"
-              transform="rotate(-90 150 150)"
-              class="fv-ring-glow"
-            />
-            <!-- 进度 -->
-            <circle
-              cx="150"
-              cy="150"
-              :r="RADIUS"
-              fill="none"
-              :stroke="ringStroke"
-              stroke-width="10"
-              stroke-linecap="round"
-              :stroke-dasharray="CIRCUMFERENCE"
-              :stroke-dashoffset="dashOffset"
-              transform="rotate(-90 150 150)"
-              class="fv-ring-progress"
-            />
+            <!--
+              不限时模式下 totalSec 为 0，画不出有意义的比例，因此只留轨道。
+              光晕与进度都带 v-if 隐藏 —— 留一个空转的弧会比不画更让人困惑。
+            -->
+            <template v-if="totalSec > 0">
+              <!-- 光晕：与进度同形，粗而淡，负责「发光」的观感 -->
+              <circle
+                cx="150"
+                cy="150"
+                :r="RADIUS"
+                fill="none"
+                :stroke="ringStroke"
+                stroke-width="24"
+                stroke-linecap="round"
+                :stroke-dasharray="CIRCUMFERENCE"
+                :stroke-dashoffset="dashOffset"
+                transform="rotate(-90 150 150)"
+                class="fv-ring-glow"
+              />
+              <!-- 进度 -->
+              <circle
+                cx="150"
+                cy="150"
+                :r="RADIUS"
+                fill="none"
+                :stroke="ringStroke"
+                stroke-width="10"
+                stroke-linecap="round"
+                :stroke-dasharray="CIRCUMFERENCE"
+                :stroke-dashoffset="dashOffset"
+                transform="rotate(-90 150 150)"
+                class="fv-ring-progress"
+              />
+            </template>
           </svg>
 
           <div class="fv-ring-content">
@@ -65,8 +71,8 @@
         </div>
 
         <div class="fv-task-line">
-          <div class="fv-task-name" :class="{ 'fv-muted': !appSetting['focus.taskName'] }">
-            {{ appSetting['focus.taskName'] || '未命名专注' }}
+          <div class="fv-task-name" :class="{ 'fv-muted': !currentTaskLabel }">
+            {{ currentTaskLabel || '未命名专注' }}
           </div>
           <div v-if="running" class="fv-violations" :class="{ hot: violations > 0 }">
             <span class="fv-violations-dot"></span>分心 {{ violations }} 次
@@ -82,13 +88,55 @@
           <template v-else>
             <button v-if="paused" class="fv-btn fv-btn-primary" @click="onResume">继续专注</button>
             <button v-else class="fv-btn" @click="onPause">暂停</button>
-            <button class="fv-btn" @click="skipPhase">跳过本阶段</button>
+            <!--
+              不限时没有「下一阶段」的终点，跳过这一阶段会直接推进到休息/结束，
+              在本模式下没有意义，因此隐藏。
+            -->
+            <button v-if="!countUpSession" class="fv-btn" @click="skipPhase">跳过本阶段</button>
             <button class="fv-btn fv-btn-danger" @click="onAbort">结束专注</button>
           </template>
         </div>
       </div>
 
-      <div class="fv-card">
+      <!--
+        音乐面板：专注中才出现。
+        待机时右栏已有完整的设置，此时再放一个播放器只会让界面变吵。
+      -->
+      <div v-if="running" class="fv-card fv-player-card">
+        <div class="fv-card-title">
+          正在播放
+          <span v-if="focusPlaylistName" class="fv-tag">{{ focusPlaylistName }}</span>
+        </div>
+        <div class="fv-now">
+          <div class="fv-now-cover">
+            <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
+          </div>
+          <div class="fv-now-copy">
+            <div class="fv-now-name">{{ currentMusicName || '暂无歌曲' }}</div>
+            <div class="fv-now-singer">{{ currentMusicSinger || '选一首歌开始，或载入专注歌单' }}</div>
+          </div>
+        </div>
+        <div class="fv-now-actions">
+          <button class="fv-btn fv-btn-sm" :disabled="!hasPlaylist" @click="onPrevMusic">上一首</button>
+          <button class="fv-btn fv-btn-sm fv-btn-primary" @click="onToggleMusic">
+            {{ isPlayingMusic ? '暂停' : '播放' }}
+          </button>
+          <button class="fv-btn fv-btn-sm" :disabled="!hasPlaylist" @click="onNextMusic">下一首</button>
+          <button
+            v-if="appSetting['focus.focusListId']"
+            class="fv-btn fv-btn-sm fv-btn-ghost"
+            @click="onLoadFocusList"
+          >
+            载入专注歌单
+          </button>
+        </div>
+      </div>
+
+      <!--
+        防护状态：待机时完整展示（它本身就是这个应用的说明书）；
+        专注中收成一行摘要，把版面让给计时与音乐。
+      -->
+      <div v-if="!running" class="fv-card">
         <div class="fv-card-title">
           防护状态
           <span class="fv-tag" :class="guardReport.nativeHelper ? 'ok' : 'warn'">
@@ -113,78 +161,153 @@
           是你按下开始键的那一刻。
         </p>
       </div>
+
+      <div v-else class="fv-guard-strip">
+        <span class="fv-guard-strip-label">防护</span>
+        <span class="fv-chip on">{{ guardReport.active.length }} 项已生效</span>
+        <span v-if="guardReport.unsupported.length" class="fv-chip off">{{ guardReport.unsupported.length }} 项系统限制</span>
+        <span v-if="!guardReport.nativeHelper" class="fv-chip off">Win 键拦截未启用</span>
+      </div>
     </div>
 
     <!-- 右：设置与统计 -->
     <div class="fv-col fv-right">
-      <div class="fv-card">
-        <div class="fv-card-title">本次目标</div>
+      <!--
+        目标卡：专注中收起。
+        专注开始后目标不能改、时长不能改、开关不能动，留着这一整卡只是噪音；
+        期间真正要看的统计与播放都已经在左栏和「近 7 天」里了。
+      -->
+      <div v-if="!running" class="fv-card">
+        <div class="fv-card-title">
+          目标
+          <span class="fv-tag">{{ currentTaskLabel || '未选择' }}</span>
+        </div>
 
+        <!-- 从已保存的目标里选，点一下即选中 -->
+        <div class="fv-field">
+          <span class="fv-field-label">选择目标</span>
+          <div v-if="goalOptions.length" class="fv-chips">
+            <button
+              v-for="goal in goalOptions"
+              :key="goal"
+              class="fv-chip fv-chip-btn"
+              :class="{ active: appSetting['focus.taskName'] === goal }"
+              @click="updateSetting({ 'focus.taskName': appSetting['focus.taskName'] === goal ? '' : goal })"
+            >
+              {{ goal }}
+            </button>
+          </div>
+          <span v-else class="fv-hint">还没有目标，在下面添加一个。</span>
+        </div>
+
+        <!-- 临时手填：不进列表，只作为本次的目标 -->
         <label class="fv-field">
-          <span class="fv-field-label">任务名称</span>
+          <span class="fv-field-label">本次目标</span>
           <input
             class="fv-input"
             :value="appSetting['focus.taskName']"
-            :disabled="running"
-            placeholder="例如：数学卷子第 3 页"
+            placeholder="也可以直接输入，不进列表"
             @change="onTaskName"
           />
         </label>
 
+        <!-- 维护列表 -->
         <div class="fv-field">
-          <span class="fv-field-label">专注时长</span>
-          <div class="fv-chips">
-            <button
-              v-for="preset in FOCUS_PRESETS"
-              :key="preset"
-              class="fv-chip fv-chip-btn"
-              :class="{ active: appSetting['focus.focusMinutes'] === preset }"
-              :disabled="running"
-              @click="updateSetting({ 'focus.focusMinutes': preset })"
-            >
-              {{ preset }} 分钟
-            </button>
+          <span class="fv-field-label">管理目标列表</span>
+          <div class="fv-inline">
+            <input
+              v-model="newGoalInput"
+              class="fv-input"
+              :maxlength="24"
+              placeholder="添加一个新目标"
+              @keyup.enter="onAddGoal"
+            />
+            <button class="fv-btn fv-btn-sm" @click="onAddGoal">添加</button>
           </div>
-          <input
-            class="fv-input"
-            type="number"
-            min="1"
-            max="240"
-            :value="appSetting['focus.focusMinutes']"
-            :disabled="running"
-            @change="updateSetting({ 'focus.focusMinutes': readNumber($event, 1, 240, 25) })"
-          />
-        </div>
-
-        <div class="fv-field-row">
-          <label class="fv-field">
-            <span class="fv-field-label">休息时长（分钟）</span>
-            <input
-              class="fv-input"
-              type="number"
-              min="1"
-              max="60"
-              :value="appSetting['focus.breakMinutes']"
-              :disabled="running"
-              @change="updateSetting({ 'focus.breakMinutes': readNumber($event, 1, 60, 5) })"
-            />
-          </label>
-          <label class="fv-field">
-            <span class="fv-field-label">轮数</span>
-            <input
-              class="fv-input"
-              type="number"
-              min="1"
-              max="12"
-              :value="appSetting['focus.rounds']"
-              :disabled="running"
-              @change="updateSetting({ 'focus.rounds': readNumber($event, 1, 12, 4) })"
-            />
-          </label>
+          <div v-if="goalOptions.length" class="fv-goal-manage">
+            <span v-for="goal in goalOptions" :key="goal" class="fv-goal-item">
+              {{ goal }}
+              <button class="fv-goal-remove" :title="`删除「${goal}」`" @click="onRemoveGoal(goal)">×</button>
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="fv-card">
+      <div v-if="!running" class="fv-card">
+        <div class="fv-card-title">
+          计时方式
+          <span class="fv-tag" :class="appSetting['focus.countUp'] ? 'ok' : ''">
+            {{ appSetting['focus.countUp'] ? '不限时' : '倒计时' }}
+          </span>
+        </div>
+
+        <div class="fv-toggle-row">
+          <div class="fv-toggle-copy">
+            <div>不限时（正向计时）</div>
+            <div class="fv-hint">
+              只累计已专注时长，不倒数、不自动结束，也不进入休息段 —— 做完了自己按结束
+            </div>
+          </div>
+          <button
+            class="fv-switch"
+            :class="{ on: appSetting['focus.countUp'] }"
+            @click="updateSetting({ 'focus.countUp': !appSetting['focus.countUp'] })"
+          ></button>
+        </div>
+
+        <!-- 倒计时专有的参数，不限时下收起，避免摆一堆用不上的输入框 -->
+        <template v-if="!appSetting['focus.countUp']">
+          <div class="fv-field">
+            <span class="fv-field-label">专注时长</span>
+            <div class="fv-chips">
+              <button
+                v-for="preset in FOCUS_PRESETS"
+                :key="preset"
+                class="fv-chip fv-chip-btn"
+                :class="{ active: appSetting['focus.focusMinutes'] === preset }"
+                @click="updateSetting({ 'focus.focusMinutes': preset })"
+              >
+                {{ preset }} 分钟
+              </button>
+            </div>
+            <input
+              class="fv-input"
+              type="number"
+              min="1"
+              max="240"
+              :value="appSetting['focus.focusMinutes']"
+              @change="updateSetting({ 'focus.focusMinutes': readNumber($event, 1, 240, 25) })"
+            />
+          </div>
+
+          <div class="fv-field-row">
+            <label class="fv-field">
+              <span class="fv-field-label">休息时长（分钟）</span>
+              <input
+                class="fv-input"
+                type="number"
+                min="1"
+                max="60"
+                :value="appSetting['focus.breakMinutes']"
+                @change="updateSetting({ 'focus.breakMinutes': readNumber($event, 1, 60, 5) })"
+              />
+            </label>
+            <label class="fv-field">
+              <span class="fv-field-label">轮数</span>
+              <input
+                class="fv-input"
+                type="number"
+                min="1"
+                max="12"
+                :value="appSetting['focus.rounds']"
+                @change="updateSetting({ 'focus.rounds': readNumber($event, 1, 12, 4) })"
+              />
+            </label>
+          </div>
+        </template>
+      </div>
+
+      <div v-if="!running" class="fv-card">
         <div class="fv-card-title">专注行为</div>
 
         <div class="fv-toggle-row">
@@ -255,38 +378,25 @@
         </label>
       </div>
 
-      <div class="fv-card">
-        <div class="fv-card-title">音乐联动</div>
+      <div v-if="!running" class="fv-card">
+        <div class="fv-card-title">专注歌单</div>
 
-        <label class="fv-field">
-          <span class="fv-field-label">专注段自动播放</span>
+        <label class="fv-field" style="margin-bottom: 0">
+          <span class="fv-field-label">专注时载入</span>
           <select
             class="fv-input"
             :value="appSetting['focus.focusListId']"
-            :disabled="running"
             @change="updateSetting({ 'focus.focusListId': readValue($event) })"
           >
-            <option value="">不改变播放状态</option>
-            <option v-for="item in listOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
-          </select>
-        </label>
-
-        <label class="fv-field" style="margin-bottom: 0">
-          <span class="fv-field-label">休息段自动播放</span>
-          <select
-            class="fv-input"
-            :value="appSetting['focus.breakListId']"
-            :disabled="running"
-            @change="updateSetting({ 'focus.breakListId': readValue($event) })"
-          >
-            <option value="">暂停音乐</option>
+            <option value="">未指定</option>
             <option v-for="item in listOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
           </select>
         </label>
 
         <p class="fv-note">
-          列表直接取自 LX Music 的「我的列表」，本地自建列表同样可以播放 —— 这是 fork 方案
-          相比外部调用协议最实在的好处。
+          这里指定的歌单不会自动播放 —— 开始与结束专注都不会改动你的播放状态。
+          它只是让专注界面里的播放面板多一个「载入专注歌单」的按钮，放不放由你决定。
+          列表直接取自 LX Music 的「我的列表」，本地自建列表同样可以播放。
         </p>
       </div>
 
@@ -379,8 +489,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from '@common/utils/vueTools'
 import { appSetting, updateSetting } from '@renderer/store/setting'
 import {
+  addGoal,
   abortFocus,
+  countUpSession,
   dismissToast,
+  focusedSec,
   guardReport,
   hasUnlockCode,
   initFocusStore,
@@ -388,9 +501,11 @@ import {
   pauseFocus,
   paused,
   phase,
+  playListById,
   pushToast,
   refreshGuardReport,
   remainingSec,
+  removeGoal,
   resumeFocus,
   round,
   running,
@@ -403,6 +518,8 @@ import {
   verifyUnlockCode,
   violations,
 } from '@renderer/store/focus'
+import { isPlay as playerIsPlay, musicInfo as currentMusic } from '@renderer/store/player/state'
+import { playNext, playPrev, pause as pauseMusic, play as playMusic } from '@renderer/core/player/action'
 
 const FOCUS_PRESETS = [15, 25, 45, 60, 90]
 const RADIUS = 132
@@ -411,6 +528,56 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 const unlockCodeInput = ref('')
 const codePrompt = ref<null | { title: string, action: 'pause' | 'resume' | 'abort' }>(null)
 const codeInput = ref('')
+const newGoalInput = ref('')
+
+/** 已保存的目标列表 */
+const goalOptions = computed<string[]>(() => appSetting['focus.goals'] ?? [])
+
+/** 当前选中的目标，空字符串时显示占位文案 */
+const currentTaskLabel = computed(() => appSetting['focus.taskName']
+  ? appSetting['focus.taskName']
+  : '')
+
+const onAddGoal = async() => {
+  const name = newGoalInput.value.trim()
+  if (!name) {
+    pushToast('warn', '请输入目标名称')
+    return
+  }
+  if (await addGoal(name)) {
+    newGoalInput.value = ''
+    pushToast('info', `已添加目标「${name}」`)
+  }
+}
+
+const onRemoveGoal = async(name: string) => {
+  await removeGoal(name)
+  pushToast('info', `已删除目标「${name}」`)
+}
+
+// ---------------------------------------------------------------- 内嵌播放面板
+
+const currentMusicName = computed(() => currentMusic.name || '')
+const currentMusicSinger = computed(() => currentMusic.singer || '')
+const currentMusicCover = computed(() => currentMusic.pic ?? '')
+const isPlayingMusic = computed(() => playerIsPlay.value)
+/** 有歌单上下文时上一首/下一首才有意义 */
+const hasPlaylist = computed(() => (currentMusic.id ?? null) != null)
+const focusPlaylistName = computed(() =>
+  listOptions.value.find(item => item.id === appSetting['focus.focusListId'])?.name ?? '')
+
+const onToggleMusic = () => {
+  if (playerIsPlay.value) pauseMusic()
+  else playMusic()
+}
+
+const onNextMusic = () => { void playNext() }
+const onPrevMusic = () => { void playPrev() }
+
+/** 手动载入专注歌单 —— 这是唯一会改变播放状态的入口，且必须由使用者点 */
+const onLoadFocusList = () => {
+  if (playListById(appSetting['focus.focusListId'])) pushToast('info', '已载入专注歌单')
+}
 
 /*
  * 标题单独算一份，不要在模板里直接写 {{ codePrompt.title }}。
@@ -448,7 +615,16 @@ const ringStroke = computed(() => {
   return 'var(--color-primary-alpha-700)'
 })
 
+/**
+ * 环内主时间。
+ *
+ * 不限时模式显示「已专注时长」（往上走），倒计时显示剩余（往下走）——
+ * 待机时按当前设置预演一下，让使用者点开始前就知道等会儿看到的是什么。
+ */
 const mainTime = computed(() => {
+  if (countUpSession.value) {
+    return formatClock(running.value && phase.value === 'focusing' ? focusedSec.value : 0)
+  }
   const sec = running.value ? remainingSec.value : appSetting['focus.focusMinutes'] * 60
   return formatClock(sec)
 })
@@ -458,7 +634,7 @@ const phaseText = computed(() => {
     case 'preparing':
       return '准备开始'
     case 'focusing':
-      return `专注中 · 第 ${round.value} 轮`
+      return countUpSession.value ? '专注中 · 不限时' : `专注中 · 第 ${round.value} 轮`
     case 'paused':
       return '已暂停'
     case 'breaking':
@@ -466,7 +642,7 @@ const phaseText = computed(() => {
     case 'completed':
       return '已完成'
     default:
-      return '准备就绪'
+      return countUpSession.value ? '不限时' : '准备就绪'
   }
 })
 
@@ -475,7 +651,8 @@ const ringHint = computed(() => {
     case 'preparing':
       return '趁现在把桌面收拾干净'
     case 'focusing':
-      return '专注锁已生效，离开会被记录'
+      // 不限时没有终点可等，提示改成与「自己判断何时结束」相关的
+      return countUpSession.value ? '不限时，做完了自己按结束' : '专注锁已生效，离开会被记录'
     case 'paused':
       return '恢复需要解锁码'
     case 'breaking':
@@ -483,7 +660,7 @@ const ringHint = computed(() => {
     case 'completed':
       return '干得不错，记录已保存'
     default:
-      return '设定时长和目标，然后开始'
+      return countUpSession.value ? '不限时：只累计，不倒数' : '设定时长和目标，然后开始'
   }
 })
 
@@ -671,6 +848,28 @@ onBeforeUnmount(() => {
     radial-gradient(760px 420px at 16% -14%, var(--color-primary-alpha-900), transparent 62%),
     radial-gradient(620px 380px at 108% 114%, var(--color-primary-alpha-900), transparent 58%);
   background-repeat: no-repeat;
+
+  /*
+   * 专注中收窄两栏。
+   *
+   * 左栏此时只剩计时 + 播放 + 防护摘要，右栏只剩 7 天统计，都撑不满原宽度，
+   * 拉满会显得松散。用 justify-content 让两栏整体居中，再给每栏限一个上界 ——
+   * 直接给 .focus-view 设 max-width 是无效的（它是 flex 容器且 position:absolute，
+   * 宽度由 inset 决定），必须作用到子项上。
+   */
+  &.is-running {
+    justify-content: center;
+
+    .fv-left {
+      flex: 0 1 auto;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .fv-right {
+      width: 320px;
+    }
+  }
 
   .fv-col {
     display: flex;
@@ -1118,6 +1317,130 @@ onBeforeUnmount(() => {
   .fv-inline {
     display: flex;
     gap: 8px;
+  }
+
+  /*
+   * 目标管理列表。
+   *
+   * 与「选择目标」的 chips 分开做：chips 是选一个（单选、可高亮），
+   * 这里是列出来删（每条带 ×），两者混在一起会分不清「点它是选中还是删除」。
+   */
+  .fv-goal-manage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .fv-goal-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 4px 3px 9px;
+    border: 1px solid var(--color-primary-alpha-800);
+    border-radius: 999px;
+    font-size: 11.5px;
+    color: var(--color-font-label);
+  }
+
+  .fv-goal-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-font-label);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+
+    &:hover {
+      background: var(--color-primary-alpha-900);
+      color: var(--color-font);
+    }
+  }
+
+  // ------------------------------------------------------------ 内嵌播放面板
+
+  .fv-player-card {
+    animation: fv-rise 0.24s ease both;
+  }
+
+  .fv-now {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fv-now-cover {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    border: 1px solid var(--color-primary-alpha-800);
+    border-radius: 10px;
+    background-color: var(--color-primary-alpha-900);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  .fv-now-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .fv-now-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-font);
+  }
+
+  .fv-now-singer {
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--color-font-label);
+  }
+
+  .fv-now-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  // 专注中的防护摘要条：把待机时那一整卡压成一行
+  .fv-guard-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-primary-alpha-800);
+    border-radius: var(--fv-radius-sm);
+    background-color: var(--color-primary-alpha-900);
+    animation: fv-rise 0.24s ease both;
+  }
+
+  .fv-guard-strip-label {
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    color: var(--color-font-label);
   }
 
   .fv-hint {

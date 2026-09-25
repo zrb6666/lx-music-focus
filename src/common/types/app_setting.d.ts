@@ -702,6 +702,22 @@ declare global {
       'focus.taskName': string
 
       /**
+       * 不限时（正向计时）。
+       *
+       * 开启后只累计已专注时长，不倒数、不自动结束，也不进入休息段 ——
+       * 适合「做完了自然停」而不是「按计划掐点」的场景。
+       */
+      'focus.countUp': boolean
+
+      /**
+       * 可复用的目标名称列表。
+       *
+       * 使用时从列表里选一个写入 focus.taskName，也可以临时手填；
+       * 列表本身在界面上可增删。
+       */
+      'focus.goals': string[]
+
+      /**
        * 严格模式：启用原生辅助进程（拦截 Win 键 / Alt+Tab + 前台窗口看门狗）
        */
       'focus.strictMode': boolean
@@ -720,14 +736,12 @@ declare global {
       'focus.unlockCode': string
 
       /**
-       * 专注段自动播放的列表 id，空字符串表示不改变播放状态
+       * 专注时建议载入的列表 id（空字符串表示未指定）。
+       *
+       * 只用于专注界面播放面板里的「载入专注歌单」按钮 ——
+       * 开始与结束专注都不会自动改变播放状态。
        */
       'focus.focusListId': string
-
-      /**
-       * 休息段自动播放的列表 id，空字符串表示暂停音乐
-       */
-      'focus.breakListId': string
 
       /**
        * 违规时是否淡出音乐作为提醒

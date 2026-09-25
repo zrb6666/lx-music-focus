@@ -35,6 +35,14 @@ export const toasts = reactive<Array<LX.FocusToastPayload & { id: number }>>([])
 export const running = computed(() => phase.value !== 'idle' && phase.value !== 'completed')
 export const paused = computed(() => phase.value === 'paused')
 
+/**
+ * 本次会话是否按不限时（正向计时）运行。
+ *
+ * 以「开始那一刻的设置」为准：会话进行中不允许改这个开关（界面已禁用），
+ * 所以直接用当前设置判断即可，无需另存快照。
+ */
+export const countUpSession = computed(() => appSetting['focus.countUp'] === true)
+
 const t = useI18n()
 
 /**
@@ -108,12 +116,58 @@ export const saveUnlockCode = async(code: string) => {
   return true
 }
 
+// ---------------------------------------------------------------- 目标列表
+
+/** 目标名称的长度上限，避免过长的名字撑破列表与统计卡片 */
+const GOAL_NAME_MAX = 24
+
+/**
+ * 目标列表去重后落盘。
+ *
+ * 用 indexOf 而不是 Set：这里要保留使用者输入的原始大小写与顺序，
+ * 只在「完全相同」时视为重复，不去做大小写折叠（「数学」和「数学(复习)」是两条）。
+ */
+const persistGoals = async(goals: string[]) => {
+  const cleaned: string[] = []
+  for (const raw of goals) {
+    const name = raw.trim().slice(0, GOAL_NAME_MAX)
+    if (!name || cleaned.includes(name)) continue
+    cleaned.push(name)
+  }
+  await updateSetting({ 'focus.goals': cleaned })
+  return cleaned
+}
+
+export const addGoal = async(name: string) => {
+  const goals = appSetting['focus.goals'] ?? []
+  if (goals.includes(name.trim().slice(0, GOAL_NAME_MAX))) {
+    pushToast('warn', '这个目标已经在列表里了')
+    return false
+  }
+  await persistGoals([...goals, name])
+  return true
+}
+
+export const removeGoal = async(name: string) => {
+  const goals = appSetting['focus.goals'] ?? []
+  await persistGoals(goals.filter(item => item !== name))
+  // 当前选中的目标被删掉时一并清空，否则会话记录里会留下一个列表中已不存在的名字
+  if (appSetting['focus.taskName'] === name) await updateSetting({ 'focus.taskName': '' })
+  return true
+}
+
 // ---------------------------------------------------------------- 音乐联动
 
 const findListName = (listId: string): string | null =>
   listOptions.value.find(item => item.id === listId)?.name ?? null
 
-const playListById = (listId: string) => {
+/**
+ * 按 ID 载入并播放一个「我的列表」。
+ *
+ * 阶段切换不再自动调它（见 syncMusicForPhase 的说明），改为导出给专注界面
+ * 内嵌的播放面板使用 —— 由使用者主动点，而不是被应用替他决定。
+ */
+export const playListById = (listId: string) => {
   if (!listId) return false
   playList(listId, 0)
   return true
@@ -227,7 +281,8 @@ const recordSession = (completed: boolean) => {
     taskName: appSetting['focus.taskName'] || '未命名专注',
     startedAt: startedAt.value ?? Date.now(),
     endedAt: Date.now(),
-    plannedSec: appSetting['focus.focusMinutes'] * 60 * appSetting['focus.rounds'],
+    // 不限时没有「计划时长」，记 0 以便统计时与倒计时会话区分
+    plannedSec: isCountUp() ? 0 : appSetting['focus.focusMinutes'] * 60 * appSetting['focus.rounds'],
     focusedSec: focusedSec.value,
     completed,
     violations: violations.value,
@@ -265,10 +320,28 @@ const stopTimer = () => {
 }
 
 const tick = () => {
-  if (phase.value === 'focusing') focusedSec.value += 1
+  if (phase.value === 'focusing') {
+    focusedSec.value += 1
+    /*
+     * 不限时（正向计时）：只往上累计，不倒数。
+     *
+     * 这里刻意不写 remainingSec —— 让它停在 0 而不是跟着涨，
+     * 界面据此判断「当前是正向计时」并只显示已专注时长。
+     * 副作用是不进 advance()，因此不会自动结束、也不会进休息段，
+     * 必须由使用者手动结束，这正是「做完了自然停」的语义。
+     */
+    if (isCountUp()) return
+  }
   remainingSec.value -= 1
   if (remainingSec.value <= 0) advance()
 }
+
+/**
+ * 当前是否处于不限时模式。
+ *
+ * 只在专注段生效：休息段仍需按时长收尾，否则一轮结束后永远等不到下一次专注。
+ */
+const isCountUp = () => appSetting['focus.countUp'] === true
 
 const advance = () => {
   if (phase.value === 'preparing') {
@@ -301,7 +374,13 @@ const enterPhase = (next: LX.FocusPhase) => {
       remainingSec.value = PREPARE_SEC
       break
     case 'focusing':
-      totalSec.value = Math.max(1, appSetting['focus.focusMinutes']) * 60
+      /*
+       * 不限时模式下 totalSec 置 0。
+       *
+       * 它是「计划总时长」的语义，只在倒计时下才有意义 —— 界面按
+       * totalSec > 0 判断能否画进度弧，置 0 即自然退化为纯数字计时。
+       */
+      totalSec.value = isCountUp() ? 0 : Math.max(1, appSetting['focus.focusMinutes']) * 60
       remainingSec.value = totalSec.value
       break
     case 'breaking':
@@ -316,26 +395,21 @@ const enterPhase = (next: LX.FocusPhase) => {
   if (prev !== next) handlePhaseChange(next, prev)
 }
 
-const syncMusicForPhase = (next: LX.FocusPhase, prev: LX.FocusPhase) => {
-  if (next === 'focusing') {
-    restoreVolume()
-    const fromStart = prev === 'preparing' || prev === 'breaking'
-    if (fromStart && appSetting['focus.focusListId']) {
-      playListById(appSetting['focus.focusListId'])
-    } else {
-      play()
-    }
-    return
-  }
-  if (next === 'breaking') {
-    if (appSetting['focus.breakListId']) playListById(appSetting['focus.breakListId'])
-    else pause()
-    return
-  }
-  if (next === 'completed' || next === 'idle') {
-    restoreVolume()
-    pause()
-  }
+/*
+ * 阶段切换不再改动音乐播放状态。
+ *
+ * 早先的实现会在进入专注段时切到 focus.focusListId 并 play()，结束/休息时
+ * pause()，用意是「专注自动放歌」。实际用下来问题很明显：使用者往往已经在听
+ * 某首歌，一按开始就被换掉；专注结束想接着听，音乐又被停掉。对一个音乐播放器
+ * 来说，专注模式改他的播放状态是越界的。
+ *
+ * 现在保留的与音乐有关的行为只有两条：
+ *   1) 违规时的淡出静默（syncViolationSilence / 已有实现），它是提醒手段而非播放控制
+ *   2) 专注界面内嵌的播放面板，由使用者自己操作
+ * 歌单配置项（focus.focusListId）仍保留，供播放面板一键载入使用。
+ */
+const syncMusicForPhase = (_next: LX.FocusPhase, _prev: LX.FocusPhase) => {
+  // 有意留空：进入/离开任何阶段都不再自动 play / pause / 切歌
 }
 
 const handlePhaseChange = (next: LX.FocusPhase, prev: LX.FocusPhase) => {

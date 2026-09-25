@@ -159,12 +159,24 @@ const defaultSetting: LX.AppSetting = {
   'focus.breakMinutes': 5,
   'focus.rounds': 4,
   'focus.taskName': '',
+  // 不限时（正向计时）：只累计已专注时长，不倒数、不自动结束、不进休息段
+  'focus.countUp': false,
   'focus.strictMode': true,
   'focus.killOnViolation': false,
   'focus.unlockCode': '',
   'focus.focusListId': '',
-  'focus.breakListId': '',
   'focus.reactOnViolation': true,
+  // 可复用的目标名称列表，使用时从里面选，也可以临时手填
+  'focus.goals': [
+    '数学',
+    '语文',
+    '英语',
+    '物理',
+    '化学',
+    '生物',
+    '背单词',
+    '刷题',
+  ],
 
 }
 
