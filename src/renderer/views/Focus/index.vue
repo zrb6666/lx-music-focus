@@ -99,7 +99,8 @@
       </div>
 
       <!--
-        音乐面板：专注中才出现。
+        播放面板：专注中才出现，把播放详情页的左封面 + 右歌词 + 底部进度条
+        收进专注界面，这样计时和音乐不必来回切页。
         待机时右栏已有完整的设置，此时再放一个播放器只会让界面变吵。
       -->
       <div v-if="running" class="fv-card fv-player-card">
@@ -107,15 +108,60 @@
           正在播放
           <span v-if="focusPlaylistName" class="fv-tag">{{ focusPlaylistName }}</span>
         </div>
-        <div class="fv-now">
-          <div class="fv-now-cover">
-            <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
+
+        <div class="fv-pd">
+          <div class="fv-pd-left">
+            <div class="fv-pd-cover">
+              <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
+              <div v-else class="fv-pd-cover-empty">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div class="fv-pd-meta">
+              <div class="fv-pd-name">{{ currentMusicName || '暂无歌曲' }}</div>
+              <div class="fv-pd-singer">{{ currentMusicSinger || '选一首歌开始，或载入专注歌单' }}</div>
+              <div v-if="currentMusicAlbum" class="fv-pd-album">{{ currentMusicAlbum }}</div>
+            </div>
           </div>
-          <div class="fv-now-copy">
-            <div class="fv-now-name">{{ currentMusicName || '暂无歌曲' }}</div>
-            <div class="fv-now-singer">{{ currentMusicSinger || '选一首歌开始，或载入专注歌单' }}</div>
+
+          <!-- 歌词：与播放详情页同一份 lyric store，逐行高亮跟随进度 -->
+          <div class="fv-pd-lyric">
+            <div
+              v-for="line in lyricWindow"
+              :key="line.key"
+              class="fv-pd-line"
+              :class="{ active: line.isActive }"
+              @click="onSeekToLine(line.time)"
+            >
+              {{ line.text }}
+            </div>
+            <div v-if="!hasLyric" class="fv-pd-line is-empty">
+              {{ currentMusicId ? '这首歌还没有歌词' : '暂无播放中的歌曲' }}
+            </div>
           </div>
         </div>
+
+        <!-- 进度条：可点击定位，与播放详情页底部那条同源 -->
+        <div class="fv-pd-progress">
+          <span class="fv-pd-time">{{ nowPlayTimeStr }}</span>
+          <div
+            class="fv-pd-track"
+            :aria-label="`播放进度 ${nowPlayTimeStr} / ${maxPlayTimeStr}`"
+            @click="onSeekByClick"
+            @mousedown="onSeekDragStart"
+          >
+            <div class="fv-pd-track-fill" :style="{ width: `${playProgress * 100}%` }">
+              <span class="fv-pd-knob" />
+            </div>
+          </div>
+          <span class="fv-pd-time">{{ maxPlayTimeStr }}</span>
+        </div>
+
         <div class="fv-now-actions">
           <button class="fv-btn fv-btn-sm" :disabled="!hasPlaylist" @click="onPrevMusic">上一首</button>
           <button class="fv-btn fv-btn-sm fv-btn-primary" @click="onToggleMusic">
@@ -192,7 +238,7 @@
               :key="goal"
               class="fv-chip fv-chip-btn"
               :class="{ active: appSetting['focus.taskName'] === goal }"
-              @click="updateSetting({ 'focus.taskName': appSetting['focus.taskName'] === goal ? '' : goal })"
+              @click="onPickGoal(goal)"
             >
               {{ goal }}
             </button>
@@ -486,7 +532,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from '@common/utils/vueTools'
+import { computed, onBeforeUnmount, onMounted, ref, toRef } from '@common/utils/vueTools'
 import { appSetting, updateSetting } from '@renderer/store/setting'
 import {
   addGoal,
@@ -511,6 +557,7 @@ import {
   running,
   saveUnlockCode,
   sessions,
+  setTaskName,
   skipPhase,
   startFocus,
   toasts,
@@ -520,6 +567,9 @@ import {
 } from '@renderer/store/focus'
 import { isPlay as playerIsPlay, musicInfo as currentMusic } from '@renderer/store/player/state'
 import { playNext, playPrev, pause as pauseMusic, play as playMusic } from '@renderer/core/player/action'
+import { lyric } from '@renderer/store/player/lyric'
+import { playProgress as playProgressStore } from '@renderer/store/player/playProgress'
+import usePlayProgress from '@renderer/utils/compositions/usePlayProgress'
 
 const FOCUS_PRESETS = [15, 25, 45, 60, 90]
 const RADIUS = 132
@@ -577,6 +627,107 @@ const onPrevMusic = () => { void playPrev() }
 /** 手动载入专注歌单 —— 这是唯一会改变播放状态的入口，且必须由使用者点 */
 const onLoadFocusList = () => {
   if (playListById(appSetting['focus.focusListId'])) pushToast('info', '已载入专注歌单')
+}
+
+// ---------------------------------------------------------------- 歌词与进度
+
+const currentMusicAlbum = computed(() => currentMusic.album ?? '')
+const currentMusicId = computed(() => currentMusic.id ?? null)
+
+/** 播放详情页那条进度条的同一份数据源 */
+const { progress: playProgress, nowPlayTimeStr, maxPlayTimeStr } = usePlayProgress()
+/** 总时长（秒），拖动与点击定位都要拿它做比例换算 */
+const maxPlayTime = toRef(playProgressStore, 'maxPlayTime')
+
+const hasLyric = computed(() => (lyric.lines?.length ?? 0) > 0)
+
+/**
+ * 只渲染当前行附近的若干行。
+ *
+ * 直接铺满整首歌的歌词会让面板很高、还要自己做平滑滚动，而专注界面里
+ * 歌词的作用是「余光扫一眼知道在唱哪句」，不是一个要去滚动浏览的阅读器。
+ * 取一个固定窗口既省渲染，也让高亮始终落在同一个视觉位置。
+ */
+const LYRIC_WINDOW = 5
+
+const lyricWindow = computed(() => {
+  const lines = lyric.lines ?? []
+  if (!lines.length) return []
+  const active = Math.max(0, Math.min(lines.length - 1, lyric.line))
+  const half = Math.floor(LYRIC_WINDOW / 2)
+  let start = active - half
+  if (start < 0) start = 0
+  if (start + LYRIC_WINDOW > lines.length) start = Math.max(0, lines.length - LYRIC_WINDOW)
+  const end = Math.min(lines.length, start + LYRIC_WINDOW)
+
+  const out: Array<{ key: string, text: string, time: number, isActive: boolean }> = []
+  for (let i = start; i < end; i++) {
+    const item = lines[i]
+    out.push({
+      // 同一首歌里时间戳可能重复，索引一并带上保证 key 唯一
+      key: `${i}-${item.time}`,
+      text: item.text || '···',
+      time: item.time ?? 0,
+      isActive: i === active,
+    })
+  }
+  return out
+})
+
+/** 点击歌词行跳到那一句 */
+const onSeekToLine = (time: number) => {
+  if (!hasPlaylist.value || !Number.isFinite(time)) return
+  seekTo(time)
+}
+
+/**
+ * 定位到某一秒。
+ *
+ * 走的是 app_event.setProgress（播放详情页底部那条进度条用的同一个入口），
+ * 不是 store 里的 setProgress —— 后者是两参数、只负责刷新显示值，
+ * 不会真正让播放器跳转。用错了会表现为「进度条动了但歌还在原处」。
+ */
+const seekTo = (time: number) => {
+  window.app_event.setProgress(time)
+}
+
+/** 点击进度条定位：按点击位置占轨道宽度的比例换算成秒 */
+const onSeekByClick = (event: MouseEvent) => {
+  const total = maxPlayTime.value
+  if (!hasPlaylist.value || !(total > 0)) return
+  const el = event.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
+  if (!rect.width) return
+  const ratioValue = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+  seekTo(total * ratioValue)
+}
+
+/**
+ * 按住进度条拖动。
+ *
+ * 监听挂在 window 上而不是轨道上：手一快就会滑出轨道元素，
+ * 挂在元素上会中途断掉，体验像「拖到一半没反应」。
+ */
+const onSeekDragStart = (event: MouseEvent) => {
+  if (!hasPlaylist.value || !(maxPlayTime.value > 0)) return
+  const track = event.currentTarget as HTMLElement
+  const rect = track.getBoundingClientRect()
+  if (!rect.width) return
+
+  const seekByClientX = (clientX: number) => {
+    const ratioValue = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    seekTo(maxPlayTime.value * ratioValue)
+  }
+
+  seekByClientX(event.clientX)
+
+  const onMove = (e: MouseEvent) => { seekByClientX(e.clientX) }
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
 }
 
 /*
@@ -741,7 +892,12 @@ function readValue(event: Event): string {
 }
 
 function onTaskName(event: Event): void {
-  updateSetting({ 'focus.taskName': (event.target as HTMLInputElement).value })
+  setTaskName((event.target as HTMLInputElement).value)
+}
+
+/** 点选目标：已选中的再点一次即取消，便于「本来只想看看」的情况 */
+function onPickGoal(goal: string): void {
+  setTaskName(appSetting['focus.taskName'] === goal ? '' : goal)
 }
 
 async function onSaveUnlockCode(): Promise<void> {
@@ -860,10 +1016,11 @@ onBeforeUnmount(() => {
   &.is-running {
     justify-content: center;
 
+    // 左栏现在要容下「计时 + 播放面板（封面 108 + 歌词）」，比之前宽
     .fv-left {
       flex: 0 1 auto;
       width: 100%;
-      max-width: 420px;
+      max-width: 560px;
     }
 
     .fv-right {
@@ -1371,20 +1528,31 @@ onBeforeUnmount(() => {
     animation: fv-rise 0.24s ease both;
   }
 
-  .fv-now {
+  /*
+   * 播放面板：把播放详情页的左封面 + 右歌词 + 底部进度条压缩进一卡。
+   *
+   * 左右分栏沿用详情页的比例关系（封面窄、歌词宽），但尺寸整体收小，
+   * 因为这里只是专注界面里的一张卡，不该压过中间那个计时环。
+   */
+  .fv-pd {
     display: flex;
-    align-items: center;
-    gap: 12px;
+    gap: 16px;
+    margin-top: 12px;
   }
 
-  .fv-now-cover {
+  .fv-pd-left {
     flex: none;
-    width: 52px;
-    height: 52px;
+    width: 108px;
+  }
+
+  .fv-pd-cover {
+    width: 108px;
+    height: 108px;
     overflow: hidden;
     border: 1px solid var(--color-primary-alpha-800);
-    border-radius: 10px;
+    border-radius: 12px;
     background-color: var(--color-primary-alpha-900);
+    box-shadow: 0 4px 14px var(--color-primary-alpha-900);
 
     img {
       width: 100%;
@@ -1394,27 +1562,150 @@ onBeforeUnmount(() => {
     }
   }
 
-  .fv-now-copy {
-    min-width: 0;
-    flex: 1;
+  // 没有封面时放一个音符占位，避免左边突然空掉一块
+  .fv-pd-cover-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--color-font-label);
+    opacity: 0.45;
+
+    svg {
+      width: 36px;
+      height: 36px;
+    }
   }
 
-  .fv-now-name {
+  .fv-pd-meta {
+    margin-top: 10px;
+    min-width: 0;
+  }
+
+  .fv-pd-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--color-font);
   }
 
-  .fv-now-singer {
+  .fv-pd-singer,
+  .fv-pd-album {
     margin-top: 3px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--color-font-label);
+  }
+
+  /*
+   * 歌词窗口：固定渲染当前行附近的几行，高亮始终落在同一视觉位置。
+   *
+   * 不做整首滚动是有意的 —— 专注界面里歌词只是「余光扫一眼知道在唱哪句」，
+   * 不是要滚动浏览的阅读器；整首铺开会让卡片很高，还会跟计时环抢注意力。
+   */
+  .fv-pd-lyric {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-flow: column nowrap;
+    justify-content: center;
+    gap: 2px;
+    // 与播放详情页歌词区一致的上下淡出遮罩
+    -webkit-mask-image: linear-gradient(transparent 0%, #fff 22%, #fff 78%, transparent 100%);
+  }
+
+  .fv-pd-line {
+    padding: 3px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--color-font-label);
+    cursor: pointer;
+    transition: color 0.2s ease, font-size 0.2s ease, opacity 0.2s ease;
+    opacity: 0.72;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    &.active {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-primary);
+      opacity: 1;
+    }
+
+    &.is-empty {
+      cursor: default;
+      opacity: 0.6;
+    }
+  }
+
+  // 进度条：与播放详情页底部那条同源，可点击定位、可按住拖动
+  .fv-pd-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .fv-pd-time {
+    flex: none;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-font-label);
+  }
+
+  .fv-pd-track {
+    position: relative;
+    flex: 1;
+    height: 4px;
+    border-radius: 999px;
+    background-color: var(--color-primary-alpha-800);
+    cursor: pointer;
+
+    // 命中区放大到 14px：4px 高的条子很难点准
+    &:before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -5px;
+      bottom: -5px;
+    }
+  }
+
+  .fv-pd-track-fill {
+    position: relative;
+    height: 100%;
+    border-radius: 999px;
+    background-color: var(--color-primary);
+    transition: width 0.2s linear;
+  }
+
+  .fv-pd-knob {
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-alpha-900);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+  }
+
+  .fv-pd-track:hover .fv-pd-knob {
+    opacity: 1;
   }
 
   .fv-now-actions {

@@ -126,6 +126,12 @@ const GOAL_NAME_MAX = 24
  *
  * 用 indexOf 而不是 Set：这里要保留使用者输入的原始大小写与顺序，
  * 只在「完全相同」时视为重复，不去做大小写折叠（「数学」和「数学(复习)」是两条）。
+ *
+ * 为什么还要手动写一次 appSetting：
+ * 主进程 mergeSetting 只把「原始类型」（string / boolean / number）的变更
+ * 收进 updatedSettingKeys 并广播回来，数组属于非原始类型会被直接 continue，
+ * 也就是 focus.goals 的改动永远不会有 on_config_change 回传。
+ * 不在这里就地赋值，界面就要等到下次整页重建才会读到新值。
  */
 const persistGoals = async(goals: string[]) => {
   const cleaned: string[] = []
@@ -134,6 +140,7 @@ const persistGoals = async(goals: string[]) => {
     if (!name || cleaned.includes(name)) continue
     cleaned.push(name)
   }
+  appSetting['focus.goals'] = cleaned
   await updateSetting({ 'focus.goals': cleaned })
   return cleaned
 }
@@ -152,8 +159,20 @@ export const removeGoal = async(name: string) => {
   const goals = appSetting['focus.goals'] ?? []
   await persistGoals(goals.filter(item => item !== name))
   // 当前选中的目标被删掉时一并清空，否则会话记录里会留下一个列表中已不存在的名字
-  if (appSetting['focus.taskName'] === name) await updateSetting({ 'focus.taskName': '' })
+  if (appSetting['focus.taskName'] === name) setTaskName('')
   return true
+}
+
+/**
+ * 设置本次目标。
+ *
+ * 与 persistGoals 同理：focus.taskName 虽然是 string，主进程确实会广播回来，
+ * 但走一圈 IPC 有延迟，点选目标这种高频操作等回传会出现「点了没反应」的错觉。
+ * 这里就地写，让选中态立刻跟手；回传到达时值相同，不会产生额外渲染。
+ */
+export const setTaskName = (name: string) => {
+  appSetting['focus.taskName'] = name
+  void updateSetting({ 'focus.taskName': name })
 }
 
 // ---------------------------------------------------------------- 音乐联动
