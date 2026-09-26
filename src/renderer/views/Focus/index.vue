@@ -1,5 +1,5 @@
 <template>
-  <div class="focus-view" :class="{ 'is-running': running }">
+  <div class="focus-view" :class="{ 'is-running': running }" :style="paneStyle">
     <!-- 左：计时器与防护状态 -->
     <div class="fv-col fv-left">
       <div class="fv-card fv-timer-card" :class="[phaseClass, { 'is-live': isLive }]">
@@ -136,6 +136,28 @@
       </div>
     </div>
 
+    <!--
+      分栏分隔条：只在专注中出现（待机时两栏一个是自适应、一个是固定 360px，
+      没有「调配比例」这回事）。往右拖左栏变宽、计时环跟着放大；往左拖把空间
+      让给右边的播放面板，歌词区随之变宽。双击复位，也可以 Tab 到它用方向键微调。
+    -->
+    <div
+      v-if="running"
+      class="fv-split"
+      :class="{ 'is-dragging': paneDragging }"
+      role="separator"
+      aria-orientation="vertical"
+      :aria-label="`调整计时区宽度，当前 ${paneWidth} 像素`"
+      :aria-valuenow="paneWidth"
+      :aria-valuemin="FOCUS_PANE_MIN_WIDTH"
+      :aria-valuemax="FOCUS_PANE_MAX_WIDTH"
+      tabindex="0"
+      @pointerdown="onPaneDragStart"
+      @dblclick="onPaneReset"
+      @keydown.left.prevent="onPaneNudge(-16)"
+      @keydown.right.prevent="onPaneNudge(16)"
+    ></div>
+
     <!-- 右：设置与统计 -->
     <div class="fv-col fv-right">
       <!--
@@ -155,16 +177,32 @@
         <div class="fv-card-title">
           正在播放
           <span v-if="focusPlaylistName" class="fv-tag">{{ focusPlaylistName }}</span>
-          <button
-            v-if="appSetting['focus.focusListId']"
-            class="fv-btn fv-btn-sm fv-btn-ghost fv-load-list"
-            @click="onLoadFocusList"
-          >
-            载入专注歌单
-          </button>
+          <div class="fv-title-actions">
+            <button
+              v-if="appSetting['focus.focusListId']"
+              class="fv-btn fv-btn-sm fv-btn-ghost"
+              @click="onLoadFocusList"
+            >
+              载入专注歌单
+            </button>
+            <!--
+              歌词开关：开着是边听边看，关掉后封面放大居中，整块版面让给歌曲信息。
+              这是个「看当前一眼就够」的显示开关，所以做成标题行上的小按钮，
+              而不是塞进设置页。
+            -->
+            <button
+              class="fv-btn fv-btn-sm fv-btn-ghost"
+              :class="{ 'is-on': showLyric }"
+              :aria-pressed="showLyric"
+              title="显示 / 隐藏歌词"
+              @click="onToggleLyric"
+            >
+              歌词
+            </button>
+          </div>
         </div>
 
-        <div class="fv-pd">
+        <div class="fv-pd" :class="{ 'no-lyric': !showLyric }">
           <div class="fv-pd-left">
             <div class="fv-pd-cover">
               <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
@@ -184,7 +222,7 @@
             </div>
           </div>
 
-          <LyricPlayer />
+          <LyricPlayer v-if="showLyric" />
         </div>
 
         <PlayBar class="fv-pd-bar" />
@@ -587,6 +625,120 @@ const onRemoveGoal = async(name: string) => {
   pushToast('info', `已删除目标「${name}」`)
 }
 
+// ------------------------------------------------------------ 分栏与显示开关
+
+/*
+ * 专注中左栏（计时区）的宽度区间与默认值。
+ *
+ * 圆环直径刻意不在这里 —— 它由栏宽在样式层推导（见 &.is-running 里的 .fv-ring-wrap），
+ * 这样「环径 = 栏宽 − 卡片内边距」这条关系只有一个出处，不会跟这里对不上。
+ * 默认 300 栏宽推出 232 的环，正是引入拖动之前手工调好的那个尺寸。
+ */
+const FOCUS_PANE_MIN_WIDTH = 240
+const FOCUS_PANE_MAX_WIDTH = 460
+const FOCUS_PANE_DEFAULT_WIDTH = 300
+/** 右栏（播放面板）至少要留出的宽度，比这更窄还不如让整列换行 */
+const FOCUS_PANE_RIGHT_MIN = 440
+
+/** 栏宽上限还要看窗口够不够宽，否则右栏会被压成一条 */
+function paneMaxWidth(): number {
+  // 从窗口宽度里刨掉：页面左右内边距 32 + 分隔条 16 + 右栏的最小宽度
+  const reserved = 32 + 16 + FOCUS_PANE_RIGHT_MIN
+  const room = window.innerWidth - reserved
+  return Math.max(FOCUS_PANE_MIN_WIDTH, Math.min(FOCUS_PANE_MAX_WIDTH, room))
+}
+
+function clampPaneWidth(width: number): number {
+  if (!Number.isFinite(width)) return FOCUS_PANE_DEFAULT_WIDTH
+  return Math.round(Math.max(FOCUS_PANE_MIN_WIDTH, Math.min(paneMaxWidth(), width)))
+}
+
+/*
+ * 专注中左栏（计时区）的宽度。
+ *
+ * 拖动过程中只改这个本地 ref，松手才落盘：updateSetting 只发消息、不就地改本地
+ * （要绕一圈主进程才回填），每个 pointermove 都落一次盘既打爆 IPC 也没意义 ——
+ * 宽度是连续量，中间态没有任何持久化的价值。所以本地 ref 负责画面，
+ * 设置只负责记住最后的结果；下次进专注时由它还原。
+ */
+const paneWidth = ref(clampPaneWidth(Number(appSetting['focus.timerPaneWidth'])))
+const paneDragging = ref(false)
+
+/*
+ * 一个变量驱动两处尺寸：左栏宽度，以及样式层由它推出的圆环直径。
+ * 只传这一个数，避免「栏宽」和「环径」各存一份、拖着拖着就对不起。
+ */
+const paneStyle = computed(() => ({ '--fv-left-w': `${paneWidth.value}px` }))
+
+/** 只在真的变了时才写，免得每次轻点都产生一次无意义的主进程消息 */
+function persistPaneWidth(): void {
+  if (paneWidth.value === Number(appSetting['focus.timerPaneWidth'])) return
+  updateSetting({ 'focus.timerPaneWidth': paneWidth.value })
+}
+
+function onPaneDragStart(event: PointerEvent): void {
+  event.preventDefault()
+  const splitter = event.currentTarget as HTMLElement
+  // 拖之前先把焦点拿过来，这样松手后可以直接用方向键微调
+  splitter.focus()
+
+  // 告诉 Tips 插件「正在拖」，否则拖动途中会沿途弹出一堆按钮气泡
+  window.app_event.dragStart()
+  paneDragging.value = true
+
+  const startX = event.clientX
+  const startWidth = paneWidth.value
+
+  /*
+   * 指针事件挂在 window 上，而不是挂在这条 16px 宽的分隔条上。
+   * 手稍微快一点指针就会滑出元素，挂在元素上监听 pointermove 会在滑出的那一瞬断掉，
+   * 症状是「拖着拖着手感突然丢了」—— 和进度条拖动是同一个坑。
+   */
+  const onMove = (moveEvent: PointerEvent) => {
+    paneWidth.value = clampPaneWidth(startWidth + moveEvent.clientX - startX)
+  }
+  const onEnd = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onEnd)
+    window.removeEventListener('pointercancel', onEnd)
+    window.app_event.dragEnd()
+    paneDragging.value = false
+    persistPaneWidth()
+  }
+
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onEnd)
+  window.addEventListener('pointercancel', onEnd)
+}
+
+/** 双击分隔条复位 */
+function onPaneReset(): void {
+  // 走一遍 clamp：窗口很窄时默认值也可能超过当前允许的上限
+  paneWidth.value = clampPaneWidth(FOCUS_PANE_DEFAULT_WIDTH)
+  persistPaneWidth()
+}
+
+/** 方向键微调，给不方便精确拖动的情况留一条路 */
+function onPaneNudge(step: number): void {
+  const next = clampPaneWidth(paneWidth.value + step)
+  if (next === paneWidth.value) return
+  paneWidth.value = next
+  persistPaneWidth()
+}
+
+/** 播放面板是否显示歌词 */
+const showLyric = computed(() => appSetting['focus.showLyric'])
+
+const onToggleLyric = (): void => {
+  const next = !showLyric.value
+  /*
+   * 先改本地再落盘。设置回传要绕一圈主进程，不先写本地的话按钮会有一小段
+   * 「按了没反应」的延迟 —— 和上轮目标列表的处理同理。
+   */
+  appSetting['focus.showLyric'] = next
+  updateSetting({ 'focus.showLyric': next })
+}
+
 // ---------------------------------------------------------------- 内嵌播放面板
 
 const currentMusicName = computed(() => currentMusic.name || '')
@@ -875,6 +1027,12 @@ onBeforeUnmount(() => {
   --fv-rest: #35d39a;
   --fv-warn: #e8a33d;
   --fv-danger: #d4544e;
+  /*
+   * 圆环直径。这里是待机时的值 —— 待机时环是整屏的主角，固定 320。
+   * 专注中它会被栏宽重新推导（见 &.is-running），环内所有字号都挂在这个变量上，
+   * 所以那一刻整块计时区是等比缩放的，而不是环变小了字还那么大。
+   */
+  --fv-ring-size: 320px;
 
   position: absolute;
   inset: 0;
@@ -901,20 +1059,26 @@ onBeforeUnmount(() => {
   &.is-running {
     align-items: stretch;
 
+    /*
+     * 两栏之间改由分隔条占位，所以把 flex 的 gap 收掉 ——
+     * 分隔条自身宽 16px，横向净间距与待机时一致，视觉节奏不断。
+     */
+    gap: 0;
+
     .fv-left {
-      flex: 0 0 300px;
+      flex: 0 0 var(--fv-left-w, 300px);
     }
 
     /*
-     * 计时环收小一圈。
+     * 计时环的直径由栏宽推导：栏宽 − 68。
      *
-     * 它原来是给整屏展示用的 320px，而专注中这一栏只有 300px 宽，
-     * 卡片左右各 24px 内边距后只剩 252px —— 不收就会横向溢出。
-     * 何况此时主角已经换成右边的播放页，环只需要让人一眼扫到还剩多久。
+     * 68 = 卡片左右内边距 24×2，再加 20 的缓冲。默认 300 的栏宽因此得到 232，
+     * 也就是之前手工调好的那个尺寸（那时这一栏固定 300，环写死 232）。
+     * 现在栏宽可以拖，环就跟着一起缩放；环内字号全部是按这个变量算的比例值，
+     * 所以不需要给「大 / 中 / 小」各写一套数字。
      */
     .fv-ring-wrap {
-      width: 232px;
-      height: 232px;
+      --fv-ring-size: calc(var(--fv-left-w, 300px) - 68px);
     }
 
     .fv-right {
@@ -941,6 +1105,51 @@ onBeforeUnmount(() => {
   .fv-right {
     width: 360px;
     flex: none;
+  }
+
+  /*
+   * 分栏分隔条（仅专注中出现）。
+   *
+   * 宽度给到 16px 而不是一条 2px 的线：视觉上只有中间那条细线，但真正可以抓的
+   * 是一个 16px 宽的区域 —— 2px 的目标要靠运气才点得中。这也是为什么这里用
+   * :before 画线、而不是直接把线画在元素上。
+   *
+   * touch-action: none 是为了让指针事件不被浏览器的滚动手势抢走。
+   */
+  .fv-split {
+    position: relative;
+    flex: none;
+    width: 16px;
+    border-radius: 8px;
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+
+    &:before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 56px;
+      transform: translate(-50%, -50%);
+      border-radius: 2px;
+      background-color: var(--color-primary-alpha-800);
+      transition: background-color 0.18s ease, width 0.18s ease, height 0.18s ease;
+    }
+
+    // 悬停 / 拖动中 / 键盘聚焦：线变粗变长并上色，明确「这条能拖」
+    &:hover:before,
+    &:focus-visible:before,
+    &.is-dragging:before {
+      width: 4px;
+      height: 104px;
+      background-color: var(--color-primary-alpha-500);
+    }
+
+    &.is-dragging:before {
+      background-color: var(--color-primary);
+    }
   }
 
   // ---------- 卡片 ----------
@@ -1019,15 +1228,16 @@ onBeforeUnmount(() => {
 
   .fv-ring-wrap {
     position: relative;
-    width: 320px;
-    height: 320px;
+    width: var(--fv-ring-size);
+    height: var(--fv-ring-size);
     flex: none;
 
     // 环内侧一团柔光，让圆环像「悬」在卡片上而不是压在上面
     &:before {
       content: '';
       position: absolute;
-      inset: 32px;
+      // 32 / 320，同样按环径的比例来
+      inset: calc(var(--fv-ring-size) * 0.1);
       border-radius: 50%;
       background-image: radial-gradient(circle, var(--color-primary-alpha-900) 0%, transparent 72%);
       pointer-events: none;
@@ -1073,6 +1283,12 @@ onBeforeUnmount(() => {
     animation: fv-breathe 4.5s ease-in-out infinite;
   }
 
+  /*
+   * 环内文字。以下所有尺寸都是「按 320px 环径算出来的比例值」，
+   * 分母统一写 320，乘数就是原来的像素值 ÷ 320 ——
+   * 例如时间 58/320 = 0.18125。这样环一变，字、间距、内边距一起等比变，
+   * 不会出现环涨到 392 而时间还停在 58px 的空旷感。
+   */
   .fv-ring-content {
     position: absolute;
     inset: 0;
@@ -1080,18 +1296,18 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: calc(var(--fv-ring-size) * 0.028125);
     pointer-events: none;
   }
 
   .fv-ring-phase {
     display: inline-flex;
     align-items: center;
-    height: 24px;
-    padding: 0 12px;
+    height: calc(var(--fv-ring-size) * 0.075);
+    padding: 0 calc(var(--fv-ring-size) * 0.0375);
     border-radius: 999px;
     background-color: var(--color-primary-alpha-900);
-    font-size: 12px;
+    font-size: calc(var(--fv-ring-size) * 0.0375);
     letter-spacing: 0.04em;
     color: var(--color-primary);
     transition: color 0.3s ease, background-color 0.3s ease;
@@ -1108,7 +1324,7 @@ onBeforeUnmount(() => {
   }
 
   .fv-ring-time {
-    font-size: 58px;
+    font-size: calc(var(--fv-ring-size) * 0.18125);
     font-weight: 200;
     line-height: 1;
     letter-spacing: 0.01em;
@@ -1117,8 +1333,8 @@ onBeforeUnmount(() => {
   }
 
   .fv-ring-hint {
-    max-width: 184px;
-    font-size: 12px;
+    max-width: calc(var(--fv-ring-size) * 0.575);
+    font-size: calc(var(--fv-ring-size) * 0.0375);
     line-height: 1.5;
     text-align: center;
     color: var(--color-font-label);
@@ -1129,7 +1345,8 @@ onBeforeUnmount(() => {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 26px;
+    // 26 / 320，跟着环径一起收放，始终贴在环内沿
+    bottom: calc(var(--fv-ring-size) * 0.08125);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1525,6 +1742,52 @@ onBeforeUnmount(() => {
   }
 
   /*
+   * 关掉歌词后的布局。
+   *
+   * 没有歌词可排，就把封面与歌曲信息放大居中，让这一块变成「现在在放什么」的展示区，
+   * 而不是左边缩着一个小封面、右边空出一大片。
+   *
+   * 高度仍沿用 .fv-pd 的 320px，内容靠 align-items: center 垂直居中 ——
+   * 这样做是为了开关歌词时整张卡片不跳高度，视线不用重新找位置。
+   */
+  .fv-pd.no-lyric {
+    align-items: center;
+    justify-content: center;
+
+    .fv-pd-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .fv-pd-cover {
+      width: 168px;
+      height: 168px;
+    }
+
+    .fv-pd-cover-empty svg {
+      width: 48px;
+      height: 48px;
+    }
+
+    .fv-pd-meta {
+      width: 100%;
+      margin-top: 14px;
+      text-align: center;
+    }
+
+    .fv-pd-name {
+      font-size: 16px;
+    }
+
+    .fv-pd-singer,
+    .fv-pd-album {
+      font-size: 12.5px;
+    }
+  }
+
+  /*
    * 底部控制条用的是播放详情页的 PlayBar 原装组件。
    *
    * 进度条拖动与时间气泡、上一首 / 播放 / 下一首，以及桌面歌词、音频可视化、
@@ -1552,9 +1815,44 @@ onBeforeUnmount(() => {
     z-index: 120;
   }
 
-  // 标题栏右侧的「载入专注歌单」：本页自己的功能，PlayBar 里没有这一项
-  .fv-load-list {
+  /*
+   * 标题行右侧的动作组（载入专注歌单 / 歌词开关）。
+   *
+   * margin-left: auto 挂在这个容器上，而不是各个按钮上 ——
+   * 两个按钮各带一个 auto 边距时剩余空间会被它们平分，按钮就飘到中间去了。
+   */
+  .fv-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-left: auto;
+  }
+
+  /*
+   * ghost 变体：标题行上的次级动作，去掉底色与边框，只留文字，
+   * 免得两个实心按钮把标题压得比内容还重。
+   */
+  .fv-btn-ghost {
+    border-color: transparent;
+    background-color: transparent;
+    color: var(--color-font-label);
+
+    &:hover:not(:disabled) {
+      border-color: transparent;
+      background-color: var(--color-primary-alpha-900);
+      color: var(--color-font);
+    }
+  }
+
+  /*
+   * 开关型按钮的「已开启」状态（当前只有歌词开关用）。
+   *
+   * 只靠文字颜色区分不够稳 —— 主题色本身可能很浅，所以在文字色之外再叠一层淡底。
+   * 模板上同时给了 aria-pressed，读屏也能读到开关状态。
+   */
+  .fv-btn-ghost.is-on {
+    background-color: var(--color-primary-alpha-800);
+    color: var(--color-primary);
   }
 
   // 专注中的防护摘要条：把待机时那一整卡压成一行
@@ -2070,7 +2368,16 @@ onBeforeUnmount(() => {
   }
 }
 
-// 窄窗口下左右两栏改竖排，避免右栏被压瘪
+/*
+ * 窄窗口下左右两栏改竖排，避免右栏被压瘪。
+ *
+ * 竖排之后「分栏拖动」这件事本身就不成立了，所以这里得把专注中那套横向布局
+ * 整套退回默认值：隐藏分隔条、撤掉栏宽、把计时环放回待机时的大小、补回被
+ * `.is-running` 收掉的 gap（竖排时它管的是上下间距，不收掉两栏会贴在一起）。
+ *
+ * 注意 .is-running 那几条规则特异性更高 —— `.focus-view.is-running .fv-right`
+ * 比 `.focus-view .fv-right` 多一个类，单靠后代选择器压不住，必须写全。
+ */
 @media (max-width: 1060px) {
   .focus-view {
     flex-direction: column;
@@ -2082,6 +2389,32 @@ onBeforeUnmount(() => {
 
     .fv-right {
       width: 100%;
+    }
+
+    .fv-split {
+      display: none;
+    }
+
+    &.is-running {
+      gap: 16px;
+
+      .fv-left {
+        /*
+         * 竖排时主轴变成纵向，这一栏的 flex-basis 跟着变成「高度」——
+         * 沿用 300 会把计时卡压成一个矮条，所以退回由内容撑开。
+         */
+        flex: none;
+        width: 100%;
+      }
+
+      .fv-right {
+        width: 100%;
+      }
+
+      // 整行都归计时区了，环不必再跟着栏宽缩，放回整屏展示的尺寸
+      .fv-ring-wrap {
+        --fv-ring-size: 320px;
+      }
     }
   }
 }
@@ -2099,6 +2432,7 @@ onBeforeUnmount(() => {
     .fv-switch,
     .fv-ring-progress,
     .fv-ring-glow,
+    .fv-split:before,
     .fv-day-bar {
       transition: none;
     }

@@ -166,6 +166,11 @@ const defaultSetting: LX.AppSetting = {
   'focus.unlockCode': '',
   'focus.focusListId': '',
   'focus.reactOnViolation': true,
+  // 专注中左栏（计时区）的宽度，可拖动两栏之间的分隔条调整。
+  // 计时环直径由它派生（环径 = 栏宽 − 68），所以拖动时环会跟着放大缩小。
+  'focus.timerPaneWidth': 300,
+  // 专注中的播放面板是否显示歌词。关掉后封面放大居中，把整块版面让给歌曲信息。
+  'focus.showLyric': true,
   // 可复用的目标名称列表，使用时从里面选，也可以临时手填
   'focus.goals': [
     '数学',
