@@ -99,86 +99,6 @@
       </div>
 
       <!--
-        播放面板：专注中才出现，把播放详情页的左封面 + 右歌词 + 底部进度条
-        收进专注界面，这样计时和音乐不必来回切页。
-        待机时右栏已有完整的设置，此时再放一个播放器只会让界面变吵。
-      -->
-      <div v-if="running" class="fv-card fv-player-card">
-        <div class="fv-card-title">
-          正在播放
-          <span v-if="focusPlaylistName" class="fv-tag">{{ focusPlaylistName }}</span>
-        </div>
-
-        <div class="fv-pd">
-          <div class="fv-pd-left">
-            <div class="fv-pd-cover">
-              <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
-              <div v-else class="fv-pd-cover-empty">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </div>
-            </div>
-            <div class="fv-pd-meta">
-              <div class="fv-pd-name">{{ currentMusicName || '暂无歌曲' }}</div>
-              <div class="fv-pd-singer">{{ currentMusicSinger || '选一首歌开始，或载入专注歌单' }}</div>
-              <div v-if="currentMusicAlbum" class="fv-pd-album">{{ currentMusicAlbum }}</div>
-            </div>
-          </div>
-
-          <!-- 歌词：与播放详情页同一份 lyric store，逐行高亮跟随进度 -->
-          <div class="fv-pd-lyric">
-            <div
-              v-for="line in lyricWindow"
-              :key="line.key"
-              class="fv-pd-line"
-              :class="{ active: line.isActive }"
-              @click="onSeekToLine(line.time)"
-            >
-              {{ line.text }}
-            </div>
-            <div v-if="!hasLyric" class="fv-pd-line is-empty">
-              {{ currentMusicId ? '这首歌还没有歌词' : '暂无播放中的歌曲' }}
-            </div>
-          </div>
-        </div>
-
-        <!-- 进度条：可点击定位，与播放详情页底部那条同源 -->
-        <div class="fv-pd-progress">
-          <span class="fv-pd-time">{{ nowPlayTimeStr }}</span>
-          <div
-            class="fv-pd-track"
-            :aria-label="`播放进度 ${nowPlayTimeStr} / ${maxPlayTimeStr}`"
-            @click="onSeekByClick"
-            @mousedown="onSeekDragStart"
-          >
-            <div class="fv-pd-track-fill" :style="{ width: `${playProgress * 100}%` }">
-              <span class="fv-pd-knob" />
-            </div>
-          </div>
-          <span class="fv-pd-time">{{ maxPlayTimeStr }}</span>
-        </div>
-
-        <div class="fv-now-actions">
-          <button class="fv-btn fv-btn-sm" :disabled="!hasPlaylist" @click="onPrevMusic">上一首</button>
-          <button class="fv-btn fv-btn-sm fv-btn-primary" @click="onToggleMusic">
-            {{ isPlayingMusic ? '暂停' : '播放' }}
-          </button>
-          <button class="fv-btn fv-btn-sm" :disabled="!hasPlaylist" @click="onNextMusic">下一首</button>
-          <button
-            v-if="appSetting['focus.focusListId']"
-            class="fv-btn fv-btn-sm fv-btn-ghost"
-            @click="onLoadFocusList"
-          >
-            载入专注歌单
-          </button>
-        </div>
-      </div>
-
-      <!--
         防护状态：待机时完整展示（它本身就是这个应用的说明书）；
         专注中收成一行摘要，把版面让给计时与音乐。
       -->
@@ -218,6 +138,67 @@
 
     <!-- 右：设置与统计 -->
     <div class="fv-col fv-right">
+      <!--
+        播放器：专注中才出现，这就是「播放页」本身。
+        歌词与底部控制条直接用播放详情页的两个真组件（LyricPlayer / PlayBar），
+        而不是自己再画一套 —— 「保留播放页所有功能」靠复用最稳：歌词滚动与右键菜单、
+        歌词选择、播放速率、音效、音量、播放模式、桌面歌词、评论、音频可视化
+        全都已经长在组件里，自己重写一遍只会漏功能，还会跟播放器状态脱节。
+      -->
+      <div
+        v-if="running"
+        class="fv-card fv-player-card"
+        :class="{ 'show-comment': isShowPlayComment }"
+      >
+        <common-audio-visualizer v-if="appSetting['player.audioVisualization']" />
+
+        <div class="fv-card-title">
+          正在播放
+          <span v-if="focusPlaylistName" class="fv-tag">{{ focusPlaylistName }}</span>
+          <button
+            v-if="appSetting['focus.focusListId']"
+            class="fv-btn fv-btn-sm fv-btn-ghost fv-load-list"
+            @click="onLoadFocusList"
+          >
+            载入专注歌单
+          </button>
+        </div>
+
+        <div class="fv-pd">
+          <div class="fv-pd-left">
+            <div class="fv-pd-cover">
+              <img v-if="currentMusicCover" :src="currentMusicCover" alt="" />
+              <div v-else class="fv-pd-cover-empty">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </div>
+            </div>
+            <div class="fv-pd-meta">
+              <div class="fv-pd-name">{{ currentMusicName || '暂无歌曲' }}</div>
+              <div class="fv-pd-singer">{{ currentMusicSinger || '选一首歌开始，或载入专注歌单' }}</div>
+              <div v-if="currentMusicAlbum" class="fv-pd-album">{{ currentMusicAlbum }}</div>
+            </div>
+          </div>
+
+          <LyricPlayer />
+        </div>
+
+        <PlayBar class="fv-pd-bar" />
+
+        <!-- 评论面板：由控制条上的评论按钮切换，与播放详情页行为一致 -->
+        <MusicComment
+          v-if="isShowPlayComment"
+          class="fv-pd-comment"
+          :show="isShowPlayComment"
+          :music-info="playMusicInfo.musicInfo"
+          @close="onCloseComment"
+        />
+      </div>
+
       <!--
         目标卡：专注中收起。
         专注开始后目标不能改、时长不能改、开关不能动，留着这一整卡只是噪音；
@@ -532,7 +513,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, toRef } from '@common/utils/vueTools'
+import { computed, onBeforeUnmount, onMounted, ref } from '@common/utils/vueTools'
 import { appSetting, updateSetting } from '@renderer/store/setting'
 import {
   addGoal,
@@ -565,11 +546,12 @@ import {
   verifyUnlockCode,
   violations,
 } from '@renderer/store/focus'
-import { isPlay as playerIsPlay, musicInfo as currentMusic } from '@renderer/store/player/state'
-import { playNext, playPrev, pause as pauseMusic, play as playMusic } from '@renderer/core/player/action'
-import { lyric } from '@renderer/store/player/lyric'
-import { playProgress as playProgressStore } from '@renderer/store/player/playProgress'
-import usePlayProgress from '@renderer/utils/compositions/usePlayProgress'
+import { isShowPlayComment, musicInfo as currentMusic, playMusicInfo } from '@renderer/store/player/state'
+import { setShowPlayComment } from '@renderer/store/player/action'
+// 播放页的原装组件：歌词与底部控制条直接复用，功能与播放详情页完全一致
+import LyricPlayer from '@renderer/components/layout/PlayDetail/LyricPlayer.vue'
+import PlayBar from '@renderer/components/layout/PlayDetail/PlayBar.vue'
+import MusicComment from '@renderer/components/layout/PlayDetail/components/MusicComment/index.vue'
 
 const FOCUS_PRESETS = [15, 25, 45, 60, 90]
 const RADIUS = 132
@@ -610,125 +592,27 @@ const onRemoveGoal = async(name: string) => {
 const currentMusicName = computed(() => currentMusic.name || '')
 const currentMusicSinger = computed(() => currentMusic.singer || '')
 const currentMusicCover = computed(() => currentMusic.pic ?? '')
-const isPlayingMusic = computed(() => playerIsPlay.value)
-/** 有歌单上下文时上一首/下一首才有意义 */
-const hasPlaylist = computed(() => (currentMusic.id ?? null) != null)
+const currentMusicAlbum = computed(() => currentMusic.album ?? '')
 const focusPlaylistName = computed(() =>
   listOptions.value.find(item => item.id === appSetting['focus.focusListId'])?.name ?? '')
-
-const onToggleMusic = () => {
-  if (playerIsPlay.value) pauseMusic()
-  else playMusic()
-}
-
-const onNextMusic = () => { void playNext() }
-const onPrevMusic = () => { void playPrev() }
 
 /** 手动载入专注歌单 —— 这是唯一会改变播放状态的入口，且必须由使用者点 */
 const onLoadFocusList = () => {
   if (playListById(appSetting['focus.focusListId'])) pushToast('info', '已载入专注歌单')
 }
 
-// ---------------------------------------------------------------- 歌词与进度
+/** 评论面板由控制条上的按钮打开，这里只负责把关闭动作同步回 store */
+const onCloseComment = () => {
+  setShowPlayComment(false)
+}
 
-const currentMusicAlbum = computed(() => currentMusic.album ?? '')
-const currentMusicId = computed(() => currentMusic.id ?? null)
-
-/** 播放详情页那条进度条的同一份数据源 */
-const { progress: playProgress, nowPlayTimeStr, maxPlayTimeStr } = usePlayProgress()
-/** 总时长（秒），拖动与点击定位都要拿它做比例换算 */
-const maxPlayTime = toRef(playProgressStore, 'maxPlayTime')
-
-const hasLyric = computed(() => (lyric.lines?.length ?? 0) > 0)
-
-/**
- * 只渲染当前行附近的若干行。
+/*
+ * 歌词与进度不再由本页自己维护。
  *
- * 直接铺满整首歌的歌词会让面板很高、还要自己做平滑滚动，而专注界面里
- * 歌词的作用是「余光扫一眼知道在唱哪句」，不是一个要去滚动浏览的阅读器。
- * 取一个固定窗口既省渲染，也让高亮始终落在同一个视觉位置。
+ * 早先这里手写了一版「固定 5 行 + 自己算进度条 + 自己换算秒数」的迷你播放器，
+ * 结果就是歌词不能滚、右键菜单没有、倍速音效音量都缺。现在整块交给
+ * LyricPlayer 与 PlayBar 两个真组件，本页只负责摆位置。
  */
-const LYRIC_WINDOW = 5
-
-const lyricWindow = computed(() => {
-  const lines = lyric.lines ?? []
-  if (!lines.length) return []
-  const active = Math.max(0, Math.min(lines.length - 1, lyric.line))
-  const half = Math.floor(LYRIC_WINDOW / 2)
-  let start = active - half
-  if (start < 0) start = 0
-  if (start + LYRIC_WINDOW > lines.length) start = Math.max(0, lines.length - LYRIC_WINDOW)
-  const end = Math.min(lines.length, start + LYRIC_WINDOW)
-
-  const out: Array<{ key: string, text: string, time: number, isActive: boolean }> = []
-  for (let i = start; i < end; i++) {
-    const item = lines[i]
-    out.push({
-      // 同一首歌里时间戳可能重复，索引一并带上保证 key 唯一
-      key: `${i}-${item.time}`,
-      text: item.text || '···',
-      time: item.time ?? 0,
-      isActive: i === active,
-    })
-  }
-  return out
-})
-
-/** 点击歌词行跳到那一句 */
-const onSeekToLine = (time: number) => {
-  if (!hasPlaylist.value || !Number.isFinite(time)) return
-  seekTo(time)
-}
-
-/**
- * 定位到某一秒。
- *
- * 走的是 app_event.setProgress（播放详情页底部那条进度条用的同一个入口），
- * 不是 store 里的 setProgress —— 后者是两参数、只负责刷新显示值，
- * 不会真正让播放器跳转。用错了会表现为「进度条动了但歌还在原处」。
- */
-const seekTo = (time: number) => {
-  window.app_event.setProgress(time)
-}
-
-/** 点击进度条定位：按点击位置占轨道宽度的比例换算成秒 */
-const onSeekByClick = (event: MouseEvent) => {
-  const total = maxPlayTime.value
-  if (!hasPlaylist.value || !(total > 0)) return
-  const el = event.currentTarget as HTMLElement
-  const rect = el.getBoundingClientRect()
-  if (!rect.width) return
-  const ratioValue = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-  seekTo(total * ratioValue)
-}
-
-/**
- * 按住进度条拖动。
- *
- * 监听挂在 window 上而不是轨道上：手一快就会滑出轨道元素，
- * 挂在元素上会中途断掉，体验像「拖到一半没反应」。
- */
-const onSeekDragStart = (event: MouseEvent) => {
-  if (!hasPlaylist.value || !(maxPlayTime.value > 0)) return
-  const track = event.currentTarget as HTMLElement
-  const rect = track.getBoundingClientRect()
-  if (!rect.width) return
-
-  const seekByClientX = (clientX: number) => {
-    const ratioValue = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    seekTo(maxPlayTime.value * ratioValue)
-  }
-
-  seekByClientX(event.clientX)
-
-  const onMove = (e: MouseEvent) => { seekByClientX(e.clientX) }
-  const onUp = () => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
-  }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
-}
 
 /*
  * 标题单独算一份，不要在模板里直接写 {{ codePrompt.title }}。
@@ -1006,25 +890,37 @@ onBeforeUnmount(() => {
   background-repeat: no-repeat;
 
   /*
-   * 专注中收窄两栏。
+   * 专注中改成分工明确的左右两栏：左窄栏放计时，右宽栏放播放页。
    *
-   * 左栏此时只剩计时 + 播放 + 防护摘要，右栏只剩 7 天统计，都撑不满原宽度，
-   * 拉满会显得松散。用 justify-content 让两栏整体居中，再给每栏限一个上界 ——
-   * 直接给 .focus-view 设 max-width 是无效的（它是 flex 容器且 position:absolute，
-   * 宽度由 inset 决定），必须作用到子项上。
+   * 待机时两栏是「计时 + 一堆设置」和「统计」，居中收窄更好看；
+   * 专注时右栏变成了整个播放页，需要横向空间给歌词和底部控制条，
+   * 因此这里放开宽度，让播放页吃掉除计时栏之外的全部空间。
+   * 注意直接给 .focus-view 设 max-width 是无效的（它是 flex 容器且
+   * position:absolute，宽度由 inset 决定），尺寸必须作用到子项上。
    */
   &.is-running {
-    justify-content: center;
+    align-items: stretch;
 
-    // 左栏现在要容下「计时 + 播放面板（封面 108 + 歌词）」，比之前宽
     .fv-left {
-      flex: 0 1 auto;
-      width: 100%;
-      max-width: 560px;
+      flex: 0 0 300px;
+    }
+
+    /*
+     * 计时环收小一圈。
+     *
+     * 它原来是给整屏展示用的 320px，而专注中这一栏只有 300px 宽，
+     * 卡片左右各 24px 内边距后只剩 252px —— 不收就会横向溢出。
+     * 何况此时主角已经换成右边的播放页，环只需要让人一眼扫到还剩多久。
+     */
+    .fv-ring-wrap {
+      width: 232px;
+      height: 232px;
     }
 
     .fv-right {
-      width: 320px;
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
     }
   }
 
@@ -1522,32 +1418,58 @@ onBeforeUnmount(() => {
     }
   }
 
-  // ------------------------------------------------------------ 内嵌播放面板
+  // ------------------------------------------------------------ 播放页（融合进专注界面）
 
+  /*
+   * 这张卡就是「播放页」：封面 + 歌曲信息 + 歌词 + 完整控制条，
+   * 其中歌词与控制条直接用的播放详情页原装组件。
+   *
+   * position: relative 给音频可视化与评论面板做定位基准 ——
+   * 那两个都是 position: absolute 且铺满各自的定位祖先。
+   * display: flex 是为了让中间的 .fv-pd 占住标题与控制条之外的剩余高度，
+   * 歌词区才有确定的高度可以滚动。
+   */
   .fv-player-card {
+    position: relative;
+    display: flex;
+    flex-flow: column nowrap;
     animation: fv-rise 0.24s ease both;
   }
 
-  /*
-   * 播放面板：把播放详情页的左封面 + 右歌词 + 底部进度条压缩进一卡。
-   *
-   * 左右分栏沿用详情页的比例关系（封面窄、歌词宽），但尺寸整体收小，
-   * 因为这里只是专注界面里的一张卡，不该压过中间那个计时环。
-   */
   .fv-pd {
     display: flex;
     gap: 16px;
     margin-top: 12px;
+    /*
+     * 歌词区必须有一个确定高度，而且 basis 不能是 0。
+     *
+     * 常见写法 flex: 1 展开是 flex-basis: 0%，而 flex-basis 在主轴（这里是纵向）
+     * 上会盖掉 height —— 卡片高度由内容撑开、没有多余空间可分配，于是基础尺寸
+     * 与增长量都是 0，歌词区直接塌成一条线。写成 1 1 auto 才会用 height 当基准。
+     */
+    flex: 1 1 auto;
+    height: 320px;
+  }
+
+  /*
+   * LyricPlayer 的根节点自带 flex: 0 0 60%（那是为播放详情页的 40/60 分栏准备的）。
+   * 这里左侧封面列是固定宽，歌词应该吃掉剩下的全部宽度，所以覆盖掉它的基准值。
+   * 选择器锚在 .fv-pd 的直接子元素上 —— .right 是 LyricPlayer 根节点的全局类名，
+   * 收在 .fv-pd 里面就不会漏到播放详情页那边去。
+   */
+  .fv-pd > .right {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .fv-pd-left {
     flex: none;
-    width: 108px;
+    width: 132px;
   }
 
   .fv-pd-cover {
-    width: 108px;
-    height: 108px;
+    width: 132px;
+    height: 132px;
     overflow: hidden;
     border: 1px solid var(--color-primary-alpha-800);
     border-radius: 12px;
@@ -1603,116 +1525,36 @@ onBeforeUnmount(() => {
   }
 
   /*
-   * 歌词窗口：固定渲染当前行附近的几行，高亮始终落在同一视觉位置。
+   * 底部控制条用的是播放详情页的 PlayBar 原装组件。
    *
-   * 不做整首滚动是有意的 —— 专注界面里歌词只是「余光扫一眼知道在唱哪句」，
-   * 不是要滚动浏览的阅读器；整首铺开会让卡片很高，还会跟计时环抢注意力。
+   * 进度条拖动与时间气泡、上一首 / 播放 / 下一首，以及桌面歌词、音频可视化、
+   * 歌词选择、评论、音效、播放速率、音量、播放模式、添加到列表，
+   * 全都长在这个组件里 —— 这正是「保留播放页所有功能」不需要自己重写的原因。
+   * 这里只做两件事：负边距让它横向铺满卡片，以及收掉原来的上下留白。
    */
-  .fv-pd-lyric {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-flow: column nowrap;
-    justify-content: center;
-    gap: 2px;
-    // 与播放详情页歌词区一致的上下淡出遮罩
-    -webkit-mask-image: linear-gradient(transparent 0%, #fff 22%, #fff 78%, transparent 100%);
+  .fv-pd-bar {
+    margin-top: 2px;
+    margin-inline: -20px;
+    margin-bottom: -20px;
+    padding-bottom: 6px;
   }
 
-  .fv-pd-line {
-    padding: 3px 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12.5px;
-    line-height: 1.5;
-    color: var(--color-font-label);
-    cursor: pointer;
-    transition: color 0.2s ease, font-size 0.2s ease, opacity 0.2s ease;
-    opacity: 0.72;
-
-    &:hover {
-      opacity: 1;
-    }
-
-    &.active {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--color-primary);
-      opacity: 1;
-    }
-
-    &.is-empty {
-      cursor: default;
-      opacity: 0.6;
-    }
-  }
-
-  // 进度条：与播放详情页底部那条同源，可点击定位、可按住拖动
-  .fv-pd-progress {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 14px;
-  }
-
-  .fv-pd-time {
-    flex: none;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-font-label);
-  }
-
-  .fv-pd-track {
-    position: relative;
-    flex: 1;
-    height: 4px;
-    border-radius: 999px;
-    background-color: var(--color-primary-alpha-800);
-    cursor: pointer;
-
-    // 命中区放大到 14px：4px 高的条子很难点准
-    &:before {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: -5px;
-      bottom: -5px;
-    }
-  }
-
-  .fv-pd-track-fill {
-    position: relative;
-    height: 100%;
-    border-radius: 999px;
-    background-color: var(--color-primary);
-    transition: width 0.2s linear;
-  }
-
-  .fv-pd-knob {
+  /*
+   * 评论面板：贴在卡片右半侧，定位方式与播放详情页里那块保持一致。
+   * z-index 必须高过音频可视化 —— 后者固定在 100，否则评论会被画在波形底下。
+   */
+  .fv-pd-comment {
     position: absolute;
-    right: -4px;
-    top: 50%;
-    width: 9px;
-    height: 9px;
-    transform: translateY(-50%);
-    border-radius: 50%;
-    background-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-alpha-900);
-    opacity: 0;
-    transition: opacity 0.18s ease;
+    right: 0;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    z-index: 120;
   }
 
-  .fv-pd-track:hover .fv-pd-knob {
-    opacity: 1;
-  }
-
-  .fv-now-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 14px;
+  // 标题栏右侧的「载入专注歌单」：本页自己的功能，PlayBar 里没有这一项
+  .fv-load-list {
+    margin-left: auto;
   }
 
   // 专注中的防护摘要条：把待机时那一整卡压成一行

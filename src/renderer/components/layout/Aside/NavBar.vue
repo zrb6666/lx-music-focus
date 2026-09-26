@@ -14,9 +14,21 @@
 
 <script lang="ts">
 import { appSetting } from '@renderer/store/setting'
+import { running as focusRunning } from '@renderer/store/focus'
 import { useI18n } from '@root/lang'
-import { ref, computed } from '@common/utils/vueTools'
+import { ref, computed, watch } from '@common/utils/vueTools'
 import { useIconSize } from '@renderer/utils/compositions/useIconSize'
+import { useRoute, useRouter } from '@common/utils/vueRouter'
+
+/*
+ * 专注期间允许留在侧边栏的页面。
+ *
+ * 「专注」本身必须在 —— 计时读数、暂停与结束专注都在那个页面上，
+ * 只留两个音乐页的话，切过去挑完歌就回不来了。
+ * 搜索 / 歌单 / 排行榜 / 设置被隐藏：它们不是听歌必需的，
+ * 却都是「本来只想看一眼，结果半小时没了」的入口。
+ */
+const FOCUS_ALLOWED_PAGES = ['Focus', 'List', 'Download']
 
 export default {
   name: 'NavBar',
@@ -24,6 +36,9 @@ export default {
     const t = useI18n()
     const dom_menu = ref<HTMLElement>()
     const iconSize = useIconSize(dom_menu, 0.32)
+
+    const route = useRoute()
+    const router = useRouter()
 
     const menus = computed(() => {
       const size = iconSize.value
@@ -93,7 +108,20 @@ export default {
           name: 'Setting',
         },
       ].filter(m => m.enable)
+        .filter(m => !focusRunning.value || FOCUS_ALLOWED_PAGES.includes(m.name))
     })
+
+    /*
+     * 专注开始时如果人正站在被隐藏的页面上（比如从托盘或快捷键起的专注），
+     * 页面本身已经进不去了，还留在那儿只会让人以为自己卡住了 —— 送回专注页。
+     */
+    watch(focusRunning, isRunning => {
+      if (!isRunning) return
+      const name = route.name as string | undefined
+      if (!name || FOCUS_ALLOWED_PAGES.includes(name)) return
+      void router.push('/focus')
+    })
+
     return {
       appSetting,
       menus,

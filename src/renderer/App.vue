@@ -1,5 +1,5 @@
 <template>
-  <div id="container" class="view-container">
+  <div id="container" class="view-container" :class="{ 'focus-running': focusRunning }">
     <layout-aside id="left" />
     <div id="right">
       <layout-toolbar id="toolbar" />
@@ -18,6 +18,7 @@
 import { onMounted } from '@common/utils/vueTools'
 // import BubbleCursor from '@common/utils/effects/cursor-effects/bubbleCursor'
 // import '@common/utils/effects/snow.min'
+import { running as focusRunning } from '@renderer/store/focus'
 import useApp from '@renderer/core/useApp'
 
 useApp()
@@ -70,6 +71,18 @@ body {
 .disableAnimation * {
   transition: none !important;
   animation: none !important;
+}
+
+/*
+ * 专注进行中收起底部的全局迷你播放条。
+ *
+ * 融合后的专注页本身就是播放页，自带一条功能更全的控制条（进度拖动、
+ * 音效、倍速、音量、播放模式、歌词、评论、可视化……），底部再挂一条
+ * 只会让界面上出现两个进度条互相打架。
+ * 待机时它照常显示 —— 那时专注页上没有播放器，它是唯一的播放入口。
+ */
+#container.focus-running #player {
+  display: none;
 }
 
 .transparent {

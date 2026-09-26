@@ -3,6 +3,7 @@ import { DATA_KEYS } from '@common/constants'
 import { FOCUS_GUARD_RENDERER_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
 import { rendererInvoke, rendererOffAll, rendererOn, rendererSend } from '@common/rendererIpc'
 import { play, pause, playList } from '@renderer/core/player/action'
+import { setShowPlayerDetail } from '@renderer/store/player/action'
 import { setVolume as setPlayerVolume } from '@renderer/plugins/player'
 import { volume as playerVolume } from '@renderer/store/player/volume'
 import { appSetting, updateSetting } from '@renderer/store/setting'
@@ -454,6 +455,14 @@ export const startFocus = () => {
   focusedSec.value = 0
   violations.value = 0
   startedAt.value = Date.now()
+  /*
+   * 顺手收起播放详情页那一层整屏浮层。
+   *
+   * 专注页现在自带完整的播放界面，若进来时它正开着，会在专注开始的瞬间
+   * 被 v-if 判掉；但 store 里 isShowPlayerDetail 仍是 true，等专注结束
+   * 它又会自己弹回来，看起来像「莫名其妙冒出个播放页」。这里一并关掉。
+   */
+  setShowPlayerDetail(false)
   enterPhase('preparing')
   startTimer()
 }

@@ -1,6 +1,6 @@
 <template lang="pug">
 transition(enter-active-class="animated slideInRight" leave-active-class="animated slideOutDown" @after-enter="handleAfterEnter" @after-leave="handleAfterLeave")
-  div(v-if="isShowPlayerDetail" :class="[$style.container, { fullscreen: isFullscreen }]" @contextmenu="handleContextMenu")
+  div(v-if="isShowPlayerDetail && !focusRunning" :class="[$style.container, { fullscreen: isFullscreen }]" @contextmenu="handleContextMenu")
     div(:class="$style.bg")
     //- div(:class="$style.bg" :style="bgStyle")
     //- div(:class="$style.bg2")
@@ -47,6 +47,14 @@ import ControlBtnsLeftHeader from './ControlBtnsLeftHeader.vue'
 import ControlBtnsRightHeader from './ControlBtnsRightHeader.vue'
 import { registerAutoHideMounse, unregisterAutoHideMounse } from './autoHideMounse'
 import { appSetting } from '@renderer/store/setting'
+/*
+ * 专注进行中不再单独弹出这一层。
+ *
+ * 专注页已经把封面、歌词与底部控制条整合进同一个界面了，这一层再弹出来
+ * 会出现两份歌词、两条进度条；而且它是 position:absolute 铺满窗口、
+ * z-index 10 的整屏浮层，压上来会把计时读数整个盖掉。
+ */
+import { running as focusRunning } from '@renderer/store/focus'
 import { closeWindow, maxWindow, minWindow, setFullScreen } from '@renderer/utils/ipc'
 
 export default {
@@ -104,6 +112,7 @@ export default {
       isShowPlayerDetail,
       isShowPlayComment,
       musicInfo,
+      focusRunning,
       hide,
       handleContextMenu,
       hideComment,
